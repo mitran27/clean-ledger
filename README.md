@@ -6,6 +6,37 @@ A bank's flagged accounts are screened, then an AI agent traces the money using 
 
 Built at the NEAR Hackathon (Build City NYC, Nov 2026). Tracks: Privacy & Private AI, AI Security & Defense.
 
+## Demo
+
+[![Animated preview of the Clean Ledger walkthrough. Click to open the full narrated demo.](media/demo-preview.gif)](media/clean-ledger-demo.mp4)
+
+The animation is a sped-up preview. Open either MP4 for the full walkthrough with narration:
+
+- **[Watch the demo (1:48)](media/clean-ledger-demo.mp4)** — architecture, investigation console, transaction flow, verification and terminal proofs.
+- **[Watch the extended demo (2:35)](media/clean-ledger-demo-extended.mp4)** — adds the Flow Log replay, showing attestation, encryption, signature checks and the signed-tool gate step by step.
+
+Both videos, the preview and all eight screenshots are together in **[media/](media/)**. The recordings use the synthetic sample ledger.
+
+## Architecture
+
+![Clean Ledger architecture: local investigation tools, attestation sidecar, signed-tool gate, NEAR AI Cloud models and case receipts.](media/architecture-diagram.png)
+
+[Full architecture page](media/architecture-full.png) · [Security layers](media/security-layers.png) · [Diagram source](docs/architecture.html)
+
+The diagram includes planned components, including the NEAR anchor and NEP-413 signing. See [What is tested, and what is not](#what-is-tested-and-what-is-not) for the current implementation's scope.
+
+## Screenshots
+
+| Investigation console | Transaction T0213: injection attempt |
+|---|---|
+| [![Investigation console with the alert queue and money trail.](media/app-overview.png)](media/app-overview.png) | [![Transaction T0213 passing through the four investigation stages.](media/transaction-flow-T0213.png)](media/transaction-flow-T0213.png) |
+
+| Verified panel | Flow Log |
+|---|---|
+| [![Verified panel showing the case's attestation and signature checks.](media/verified-panel.png)](media/verified-panel.png) | [![Flow Log showing each investigation step and why it happened.](media/flow-log.png)](media/flow-log.png) |
+
+![Terminal proofs: forged tool calls refused and offline receipt verification passing.](media/proofs-terminal.png)
+
 ## Why it is different
 
 Most private-AI apps send one prompt to one TEE model and show an attestation badge. Clean Ledger proves each step of a multi-step agent:
@@ -22,7 +53,7 @@ Most private-AI apps send one prompt to one TEE model and show an attestation ba
 | Attested failover | outages, without falling back to a weaker model | 3 attested TEE models with E2EE |
 | Transcript chain + receipt | evidence being edited afterwards | local hashes (NEAR anchor: next step) |
 
-Architecture diagram: [docs/architecture.html](docs/architecture.html).
+Architecture diagram: [image](media/architecture-diagram.png) · [HTML source](docs/architecture.html).
 
 ## How a case runs
 
@@ -88,6 +119,7 @@ app/                     FastAPI server and the investigation UI
 stages/                  ICM stage contracts and outputs
 samples/                 synthetic bank data and past cases
 docs/architecture.html   architecture diagram
+media/                   narrated demo videos, animated preview and screenshots
 ```
 
 License: MIT.

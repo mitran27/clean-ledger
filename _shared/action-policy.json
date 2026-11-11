@@ -1,0 +1,27 @@
+{
+  "description": "Policy gate: every action the agent proposes is allowed or denied here. Allowed actions go straight to the outbox; no human step.",
+  "actions": {
+    "close_case": {
+      "min_risk": 0.0,
+      "min_evidence": 1
+    },
+    "request_info": {
+      "min_risk": 0.3,
+      "min_evidence": 1
+    },
+    "file_sar": {
+      "min_risk": 0.7,
+      "min_evidence": 3
+    },
+    "freeze_account": {
+      "min_risk": 0.85,
+      "min_evidence": 4,
+      "max_amount_usd": 250000
+    }
+  },
+  "global": {
+    "max_actions_per_case": 3,
+    "deny_unknown_actions": true,
+    "evidence_must_cite_txn_ids": true
+  }
+}

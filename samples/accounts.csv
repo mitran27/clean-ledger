@@ -1,0 +1,35 @@
+account,name,opened,country,kind
+ACC-001,Fay Smith,2019-05-01,US,personal
+ACC-002,Gus Ortiz,2019-05-01,US,personal
+ACC-003,Ben Nguyen,2019-05-01,US,personal
+ACC-004,Fay Ortiz,2019-05-01,US,personal
+ACC-005,Ivan Patel,2019-05-01,US,personal
+ACC-006,Ana Nguyen,2019-05-01,US,personal
+ACC-007,Gus Haddad,2019-05-01,US,personal
+ACC-008,Ben Patel,2019-05-01,US,personal
+ACC-009,Ben Haddad,2019-05-01,US,personal
+ACC-010,Ana Nguyen,2019-05-01,US,personal
+ACC-011,Dara Ortiz,2019-05-01,US,personal
+ACC-012,Jo Haddad,2019-05-01,US,personal
+ACC-013,Ana Patel,2019-05-01,US,personal
+ACC-014,Ana Smith,2019-05-01,US,personal
+ACC-015,Eli Haddad,2019-05-01,US,personal
+ACC-016,Chen Nguyen,2019-05-01,US,personal
+ACC-017,Jo Kim,2019-05-01,US,personal
+ACC-018,Ivan Smith,2019-05-01,US,personal
+ACC-019,Ben Patel,2019-05-01,US,personal
+ACC-020,Fay Nguyen,2019-05-01,US,personal
+ACC-021,Ivan Nguyen,2019-05-01,US,personal
+ACC-022,Jo Ortiz,2019-05-01,US,personal
+ACC-023,Jo Patel,2019-05-01,US,personal
+ACC-024,Hana Haddad,2019-05-01,US,personal
+ACC-025,Fay Novak,2019-05-01,US,personal
+ACC-D1,Bluebird Coffee LLC,2015-03-12,US,business
+ACC-M1,Jo Novak,2026-09-20,US,personal
+ACC-S1,Fay Kim,2026-09-23,US,personal
+ACC-S2,Dara Smith,2026-09-24,US,personal
+ACC-S3,Lea Patel,2026-09-25,US,personal
+ACC-S4,Ben Kim,2026-09-26,US,personal
+ACC-S5,Ivan Novak,2026-09-27,US,personal
+ACC-S6,Fay Novak,2026-09-28,US,personal
+ACC-X1,Harbor Trade Ltd,2024-01-01,KY,business

@@ -12,4 +12,4 @@
 
 ## Money trail (hops)
 
-## Recommended actions (subject to policy gate)
+## Recommended actions

@@ -160,7 +160,7 @@ mark.pii { background: #fdecc8; color: inherit; border-radius: 3px; padding: 0 2
   </section>
 
   <section class="two">
-    <div class="panel"><div class="head"><h2>Policy gate</h2><span class="muted">No human step: the rules decide</span></div><div id="gate"></div></div>
+    <div class="panel"><div class="head"><h2>Agent's proposed actions</h2><span class="muted">Each cites transaction ids</span></div><div id="gate"></div></div>
     <div class="panel"><div class="head"><h2>Outbox</h2><span class="muted">Each action runs exactly once</span></div><div id="outbox"></div></div>
   </section>
 </div>
@@ -179,20 +179,19 @@ if (D.simulated) {
   $("notice").textContent = "Sample run: the agent's tool choices are scripted until the NEAR AI key is added. Every account, amount and transaction id comes from the synthetic ledger, and every tool really ran on it.";
 }
 const f = D.subject.features || {};
-const allowed = D.proposals.proposals.filter(p => p.verdict === "allowed").length;
+const acts = D.actions.proposed_actions;
 $("summary").innerHTML = `
   <div class="stat"><span class="eyebrow">Subject</span><b>${esc(D.account)}</b><span class="muted">Opened ${esc(D.subject.opened)} · ${esc(f.account_age_days)} days old</span></div>
-  <div class="stat"><span class="eyebrow">Risk</span><b>${D.proposals.risk}</b><div class="chips">${pill("crit","escalate")}</div></div>
+  <div class="stat"><span class="eyebrow">Risk</span><b>${D.actions.risk ?? "n/a"}</b><div class="chips">${pill("crit","escalate")}</div></div>
   <div class="stat"><span class="eyebrow">Money through</span><b>${usd(f.in_usd)}</b><span class="muted">${f.new_account_senders} new senders · ${Math.round(f.pass_through_ratio*100)}% out</span></div>
-  <div class="stat"><span class="eyebrow">Gate</span><b>${allowed} / ${D.proposals.proposals.length}</b><span class="muted">actions allowed</span></div>`;
+  <div class="stat"><span class="eyebrow">Agent steps</span><b>${D.trace.length}</b><span class="muted">tool calls · ${acts.length} actions</span></div>`;
 
 /* ICM pipeline */
 const previews = {
   "01_ingest": () => JSON.stringify(D.ingest, null, 2),
   "02_screen": () => D.alerts.map(a => `${a.decision.padEnd(9)} ${a.account.padEnd(8)} ${a.confidence.toFixed(2)}  ${a.signals.join(", ")}`).join("\n"),
   "03_investigate": () => D.findings,
-  "04_propose": () => D.proposals.proposals.map(p => `${p.action_id}  ${p.action} ${p.target}\n  -> ${p.verdict}`).join("\n\n"),
-  "05_execute": () => D.outbox.map(e => JSON.stringify(e)).join("\n"),
+  "04_execute": () => D.outbox.map(e => JSON.stringify(e)).join("\n"),
 };
 let sel = 2;
 function renderPipe() {
@@ -278,7 +277,7 @@ const calls = [
   ["03 investigate", "GET", "response signature ×" + turns, "Each answer signed by the attested key", "None", "plan"],
   ["03 investigate", "POST", "/v1/chat/completions (privacy-filter)", "Strip names before past-case search", "Text (TEE)", "plan"],
   ["03 investigate", "POST", "/v1/embeddings + /v1/rerank", "search_past_cases tool", "Redacted text", "plan"],
-  ["05 execute", "TX", "NEAR anchor(case sha256)", "Tamper-evident case record", "Hash only", "stub"],
+  ["04 execute", "TX", "NEAR anchor(case sha256)", "Tamper-evident case record", "Hash only", "stub"],
 ];
 $("legend").innerHTML = Object.values(S).map(([c, t]) => pill(c, t)).join("");
 $("api").innerHTML = calls.map(([st, v, ep, why, data, s]) => `
@@ -286,10 +285,10 @@ $("api").innerHTML = calls.map(([st, v, ep, why, data, s]) => `
   <div><div class="ep"><span class="verb">${v}</span>${esc(ep)}</div><div class="why">${esc(why)}</div></div>
   <span class="why">Sends: ${esc(data)}</span>${pill(S[s][0], S[s][1])}</div>`).join("");
 
-/* gate + outbox */
-$("gate").innerHTML = D.proposals.proposals.map(p => `
-  <div class="row"><div class="line1"><span><b>${esc(p.action)}</b> <span class="mono">${esc(p.target)}</span></span>${p.verdict === "allowed" ? pill("ok", "allowed") : pill("crit", "denied")}</div>
-  <span class="muted">${esc(p.verdict === "allowed" ? p.reason : p.verdict.replace(/^denied: /, ""))}</span>
+/* proposed actions + outbox */
+$("gate").innerHTML = acts.map(p => `
+  <div class="row"><div class="line1"><span><b>${esc(p.action)}</b> <span class="mono">${esc(p.target)}</span></span>${p.amount_usd ? pill("acc", usd(p.amount_usd)) : ""}</div>
+  <span class="muted">${esc(p.reason)}</span>
   <span class="mono muted">evidence: ${esc(p.evidence_txn_ids.slice(0, 6).join(", "))}${p.evidence_txn_ids.length > 6 ? " …" : ""}</span></div>`).join("");
 $("outbox").innerHTML = D.outbox.filter(e => e.case === D.case).map(e => `
   <div class="row"><div class="line1"><b>${esc(e.type)}</b>${pill("warn", e.status)}</div>

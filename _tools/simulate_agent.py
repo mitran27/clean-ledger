@@ -60,7 +60,7 @@ def main() -> None:
 ## Money trail (hops)
 cash deposits -> {', '.join(senders)} -> {acct} -> {wire['to_account']} ({wire['country']})
 
-## Recommended actions (subject to policy gate)
+## Recommended actions
 file_sar, freeze_account
 """
     actions = {"case": case, "risk": 0.92, "simulated": True, "proposed_actions": [
@@ -68,8 +68,6 @@ file_sar, freeze_account
          "reason": "Fan-in from new accounts funded by structured cash, then offshore wire."},
         {"action": "freeze_account", "target": acct, "amount_usd": wire["amount_usd"],
          "evidence_txn_ids": in_ids[:3] + out_ids, "reason": "Rapid pass-through of ~all inbound funds."},
-        {"action": "freeze_account", "target": wire["to_account"], "amount_usd": 900000,
-         "evidence_txn_ids": ["T9999"], "reason": "Deliberately bad proposal: cites a non-existent txn."},
     ]}
     (OUT / f"{case}.findings.md").write_text(findings)
     (OUT / f"{case}.actions.json").write_text(json.dumps(actions, indent=2))
@@ -80,7 +78,7 @@ file_sar, freeze_account
         {"model": "z-ai/glm-5.3-flash", "tier": "confidential", "simulated": True,
          "response_ids": [], "attestation": None, "signatures": None}, indent=2))
     (OUT / "check.md").write_text("pass\n")
-    print(f"{case}: {len(trace)} tool calls, 3 proposals (simulated)")
+    print(f"{case}: {len(trace)} tool calls, 2 proposals (simulated)")
 
 
 if __name__ == "__main__":

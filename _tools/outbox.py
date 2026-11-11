@@ -1,4 +1,4 @@
-"""outbox.py - stage 05: gate-allowed actions become outbox events, exactly once.
+"""outbox.py - stage 04: the agent's proposed actions become outbox events, exactly once.
 
 Idempotency key = sha256(case | action | target). A key already in outbox.jsonl
 is skipped, so re-running this script never duplicates an action.
@@ -12,8 +12,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
-PROP = ROOT / "stages" / "04_propose" / "output"
-OUT = ROOT / "stages" / "05_execute" / "output"
+PROP = ROOT / "stages" / "03_investigate" / "output"
+OUT = ROOT / "stages" / "04_execute" / "output"
 EVENT = {"file_sar": "FileSAR", "freeze_account": "FreezeAccount",
          "request_info": "RequestInfo", "close_case": "CloseCase"}
 
@@ -26,13 +26,14 @@ def main() -> None:
     if len(sys.argv) != 2:
         sys.exit(__doc__)
     case = sys.argv[1]
-    props = json.loads((PROP / f"{case}.proposals.json").read_text())["proposals"]
+    props = [{**p, "action_id": f"{case}-a{i + 1}"} for i, p in enumerate(
+        json.loads((PROP / f"{case}.actions.json").read_text())["proposed_actions"])]
     OUT.mkdir(parents=True, exist_ok=True)
     box = OUT / "outbox.jsonl"
     existing = {json.loads(l)["idempotency_key"] for l in box.read_text().splitlines() if l} \
         if box.exists() else set()
 
-    to_write = [p for p in props if p["verdict"] == "allowed"]
+    to_write = list(props)
     if to_write:
         to_write.append({"action": "anchor_case", "target": case, "action_id": f"{case}-anchor"})
     EVENT["anchor_case"] = "AnchorCase"

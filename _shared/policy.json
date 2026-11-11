@@ -1,0 +1,12 @@
+{
+  "base_url": "https://cloud-api.near.ai/v1",
+  "models": {
+    "z-ai/glm-5.3-flash":                    {"tier": "confidential", "allow_raw": true},
+    "deepseek-ai/DeepSeek-V4.1-Flash-1017":  {"tier": "confidential", "allow_raw": true},
+    "openai/privacy-filter":                 {"tier": "confidential", "allow_raw": true},
+    "deepseek/deepseek-v3.2":                {"tier": "attested-3p",  "allow_raw": false},
+    "typesafe/jev-1.13":                     {"tier": "unverified",   "allow_raw": false}
+  },
+  "default_unknown": "deny",
+  "note": "Embedding and rerank model ids are added after the first API check."
+}

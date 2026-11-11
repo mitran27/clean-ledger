@@ -1,0 +1,7 @@
+{
+  "question": "Classify this bug bounty report.",
+  "choices": ["spam", "duplicate", "valid"],
+  "also": {"severity": ["critical", "high", "medium", "low", "none"]},
+  "context_fields": ["redacted_report", "top_candidates"],
+  "note": "Exact Jev request schema: confirm from https://docs.typesafe.ai/concepts/system-one before first call."
+}

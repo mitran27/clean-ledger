@@ -22,6 +22,9 @@ import sys
 import time
 from pathlib import Path
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from events import emit  # noqa: E402
+
 ROOT = Path(__file__).resolve().parent.parent
 INV = ROOT / "stages" / "03_investigate" / "output"
 EXE = ROOT / "stages" / "04_execute" / "output"
@@ -73,6 +76,9 @@ class Chain:
         body["hash"] = sha(canon(body))
         with self.path.open("a") as f:
             f.write(json.dumps(body) + "\n")
+        emit("receipt", "agent", f"Step {entry.get('step')} sealed in the transcript chain",
+             because="its hashes are linked to the previous step, so any later edit breaks the chain",
+             hash=body["hash"][:14] + "…", previous=body["prev"][:14] + "…")
         self.head, self.length = body["hash"], self.length + 1
         return self.head
 
@@ -117,6 +123,9 @@ def build_receipt(case: str) -> dict:
         "anchor_tx": None,  # NEAR anchor of receipt_sha256: next step
     }
     rec["receipt_sha256"] = sha(canon(rec))
+    emit("receipt", "agent", "Case receipt sealed", because="proofs, policy hashes, chain head and outbox keys, "
+         "with no customer data; an examiner can re-verify it offline", receipt_hash=rec["receipt_sha256"][:16] + "…",
+         chain_steps=len(chain), outbox_keys=len(rec["outbox_keys"]))
     EXE.mkdir(parents=True, exist_ok=True)
     (EXE / f"{case}.receipt.json").write_text(json.dumps(rec, indent=2))
     return rec

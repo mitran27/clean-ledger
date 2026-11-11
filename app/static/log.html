@@ -1,0 +1,167 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Clean Ledger Flow Log</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: summary counters, colour legend, then a causal timeline of every event in the latest run. Light only. */
+:root {
+  color-scheme: light;
+  --bg: #f4f7f6; --surface: #ffffff; --ink: #15211d; --muted: #5d6c66; --line: #dde6e2;
+  --accent: #0e7a62; --crit: #b8402b; --crit-soft: #fbe7e2; --warn: #a8690f; --warn-soft: #fdf6e8;
+  --display: "Space Grotesk", "Segoe UI", system-ui, sans-serif;
+  --body: "Inter", system-ui, -apple-system, sans-serif;
+  --mono: "JetBrains Mono", ui-monospace, Menlo, monospace;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; }
+body { background: var(--bg); color: var(--ink); font: 14px/1.5 var(--body); }
+header.top { position: sticky; top: 0; z-index: 5; background: var(--surface); border-bottom: 1px solid var(--line);
+  display: flex; flex-wrap: wrap; gap: 12px; align-items: center; justify-content: space-between; padding: 12px max(16px, env(safe-area-inset-left, 0px)); }
+.brand { display: flex; align-items: center; gap: 10px; }
+.mark { width: 30px; height: 30px; border-radius: 8px; background: var(--accent); }
+h1 { font: 600 20px/1.2 var(--display); margin: 0; }
+.wrap { max-width: 1180px; margin: 0 auto; padding: 20px max(16px, env(safe-area-inset-left, 0px)) 60px; display: grid; gap: 16px; }
+.muted { color: var(--muted); }
+a.nav { color: var(--accent); font-weight: 600; text-decoration: none; }
+.btn { cursor: pointer; border: 0; border-radius: 9px; padding: 8px 14px; font: 600 13px var(--body); background: var(--accent); color: #fff; }
+.btn.ghost { background: var(--surface); color: var(--accent); border: 1px solid var(--accent); }
+.btn:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
+.tiles { display: grid; grid-template-columns: repeat(8, minmax(0, 1fr)); gap: 10px; }
+.tile { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px; display: grid; gap: 2px; border-top: 4px solid var(--c); }
+.tile b { font: 600 22px/1.1 var(--display); font-variant-numeric: tabular-nums; }
+.tile span { font-size: 11.5px; color: var(--muted); }
+.legend { display: flex; flex-wrap: wrap; gap: 6px; }
+.chip { display: inline-flex; align-items: center; gap: 6px; padding: 2px 9px; border-radius: 999px; font: 600 11px/1.6 var(--body); letter-spacing: .03em; color: var(--c); background: var(--s); white-space: nowrap; }
+.chip::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: var(--c); }
+.actor { font: 500 11px/1.6 var(--mono); color: var(--muted); border: 1px solid var(--line); border-radius: 6px; padding: 0 6px; background: var(--surface); white-space: nowrap; }
+.log { display: grid; gap: 6px; }
+.row { display: grid; grid-template-columns: 62px 4px minmax(0, 1fr); gap: 12px; align-items: stretch; background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 9px 12px; }
+.row .t { font: 500 12px/1.4 var(--mono); color: var(--muted); padding-top: 2px; font-variant-numeric: tabular-nums; }
+.row .bar { border-radius: 4px; background: var(--c); }
+.row .main { display: grid; gap: 3px; min-width: 0; }
+.row .l1 { display: flex; flex-wrap: wrap; gap: 6px 8px; align-items: center; }
+.row .title { font-weight: 600; }
+.row .why { color: var(--muted); font-size: 13px; }
+.row .why b { color: var(--ink); font-weight: 600; }
+.row .det { display: flex; flex-wrap: wrap; gap: 4px 12px; font: 12px/1.5 var(--mono); color: var(--muted); }
+.row .det i { font-style: normal; color: var(--ink); }
+.row.fail { background: var(--crit-soft); border-color: #f0c4b9; } .row.fail .title { color: var(--crit); }
+.row.warn { background: var(--warn-soft); border-color: #f0dcb4; } .row.warn .title { color: var(--warn); }
+.step { display: flex; align-items: center; gap: 10px; margin-top: 10px; font: 600 15px var(--display); }
+.step::after { content: ""; flex: 1; height: 1px; background: var(--line); }
+.empty { padding: 40px; text-align: center; color: var(--muted); background: var(--surface); border-radius: 12px; border: 1px solid var(--line); }
+.hide { display: none !important; }
+@media (prefers-reduced-motion: no-preference) { .row.new { animation: pop .45s ease-out; } @keyframes pop { from { transform: translateY(6px); background: #eaf6f1; } to { transform: none; } } }
+@media (max-width: 900px) { .tiles { grid-template-columns: repeat(4, minmax(0, 1fr)); } .row { grid-template-columns: 50px 4px minmax(0, 1fr); } }
+</style>
+</head>
+<body>
+<header class="top">
+  <div class="brand"><div class="mark" aria-hidden="true"></div>
+    <div><h1>Flow Log</h1><p class="muted" style="margin:0;font-size:12.5px">Every step of the latest investigation, and why it happened</p></div></div>
+  <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+    <span class="muted" id="live" style="font-size:12.5px"></span>
+    <button class="btn" id="replay">Replay step by step</button>
+    <button class="btn ghost" id="all">Show all</button>
+    <a class="nav" href="/">← Investigation</a>
+  </div>
+</header>
+<div class="wrap">
+  <section class="tiles" id="tiles" aria-label="Run summary"></section>
+  <div class="legend" id="legend"></div>
+  <section class="log" id="log" aria-live="polite"></section>
+</div>
+<script>
+const K = {
+  info:    ["#5d6c66", "#eef2f0", "agent"],      attest: ["#5b4bb7", "#eeebfa", "attestation"],
+  key:     ["#0e7a62", "#e3f2ed", "key"],         crypto: ["#3b5bdb", "#e7ecfd", "encryption"],
+  model:   ["#8a4fb3", "#f3eafa", "model"],       sign:   ["#1d8a4b", "#e4f4ea", "signature"],
+  gate:    ["#0f6b3e", "#dcefe3", "tool gate"],   tool:   ["#475569", "#eef1f4", "tool"],
+  guard:   ["#a8690f", "#fbf0dc", "guard"],       memory: ["#0e7490", "#e0f2f6", "memory"],
+  review:  ["#b0306a", "#fbe7f1", "2nd model"],   outbox: ["#c2560c", "#fdecdf", "outbox"],
+  receipt: ["#2a6fb8", "#e4eef9", "receipt"],
+};
+const $ = id => document.getElementById(id);
+const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const chip = k => { const [c, s, l] = K[k] || K.info; return `<span class="chip" style="--c:${c};--s:${s}">${esc(l)}</span>`; };
+let events = [], replaying = false;
+$("legend").innerHTML = Object.keys(K).map(chip).join("");
+
+function tiles(ev) {
+  const n = (f) => ev.filter(f).length;
+  const T = [
+    ["attest", n(e => e.kind === "attest" && e.title.startsWith("✓")), "attestation checks passed"],
+    ["key", n(e => e.title.includes("REGISTERED")), "model keys registered"],
+    ["key", n(e => e.title.startsWith("Client key pair")), "client key pairs created"],
+    ["crypto", n(e => e.title.startsWith("Encrypted")), "encrypted model calls"],
+    ["sign", n(e => e.kind === "sign" && e.title.startsWith("Request and response")), "signatures + hashes verified"],
+    ["gate", n(e => e.title.startsWith("Signed-tool gate PASSED")), "steps passed the tool gate"],
+    ["guard", n(e => e.title.includes("WITHHELD")), "injection memos withheld"],
+    ["outbox", n(e => e.title.startsWith("Queued")), "actions queued once"],
+  ];
+  $("tiles").innerHTML = T.map(([k, v, l]) => `<div class="tile" style="--c:${(K[k] || K.info)[0]}"><b>${v}</b><span>${esc(l)}</span></div>`).join("");
+}
+function rowHtml(e, t0) {
+  if (e.status === "step") return `<div class="step">${esc(e.title.split(":")[0])}<span class="muted" style="font:400 13px var(--body)">${esc(e.title.split(":").slice(1).join(":"))}</span></div>`;
+  const [c] = K[e.kind] || K.info;
+  const det = Object.entries(e.detail || {}).map(([k, v]) => `<span>${esc(k)}: <i>${esc(Array.isArray(v) ? v.join(", ") : v)}</i></span>`).join("");
+  return `<div class="row ${e.status === "fail" ? "fail" : e.status === "warn" ? "warn" : ""}" style="--c:${c}">
+    <span class="t">+${((e.ts - t0)).toFixed(1)}s</span><span class="bar"></span>
+    <div class="main"><div class="l1">${chip(e.kind)}<span class="actor">${esc(e.actor)}</span><span class="title">${esc(e.title)}</span></div>
+    ${e.because ? `<div class="why"><b>because</b> ${esc(e.because)}</div>` : ""}
+    ${det ? `<div class="det">${det}</div>` : ""}</div></div>`;
+}
+function render(ev, reveal = ev.length) {
+  if (!ev.length) { $("log").innerHTML = `<div class="empty">No events yet. Start an investigation from the Investigation page.</div>`; tiles([]); return; }
+  const t0 = ev[0].ts;
+  $("log").innerHTML = ev.map((e, i) => `<div data-i="${i}" class="${i < reveal ? "" : "hide"}">${rowHtml(e, t0)}</div>`).join("");
+  tiles(ev.slice(0, reveal));
+}
+async function load() {
+  try { const r = await fetch("/api/events"); const ev = await r.json();
+    if (!replaying && ev.length !== events.length) { events = ev; render(events); }
+    const age = events.length ? Math.round(Date.now() / 1000 - events[events.length - 1].ts) : null;
+    $("live").textContent = events.length ? `${events.length} events · last ${age < 120 ? age + "s" : Math.round(age / 60) + " min"} ago` : "";
+  } catch {}
+}
+async function replay(speed = 1) {
+  replaying = true; render(events, 0); scrollTo(0, 0);
+  const nodes = [...document.querySelectorAll("#log > div")];
+  for (let i = 0; i < nodes.length; i++) {
+    nodes[i].classList.remove("hide"); nodes[i].firstElementChild?.classList.add("new");
+    tiles(events.slice(0, i + 1));
+    const r = nodes[i].getBoundingClientRect();
+    if (r.bottom > innerHeight - 40) scrollBy({ top: r.bottom - innerHeight + 140, behavior: "smooth" });
+    const gap = i + 1 < events.length ? events[i + 1].ts - events[i].ts : 0;
+    await new Promise(res => setTimeout(res, Math.min(1300, Math.max(380, gap * 1000 * 0.25)) / speed));
+  }
+  replaying = false;
+}
+// For narrated demos: reveal rows from the current position up to row n, spread over ms.
+let shown = 0;
+window.revealTo = async (n, ms) => {
+  replaying = true;
+  if (shown === 0) { render(events, 0); scrollTo(0, 0); }
+  const nodes = [...document.querySelectorAll("#log > div")];
+  n = Math.min(n, nodes.length);
+  const per = Math.max(60, ms / Math.max(1, n - shown));
+  for (; shown < n; shown++) {
+    nodes[shown].classList.remove("hide"); nodes[shown].firstElementChild?.classList.add("new");
+    tiles(events.slice(0, shown + 1));
+    const r = nodes[shown].getBoundingClientRect();
+    if (r.bottom > innerHeight - 30) scrollBy({ top: r.bottom - innerHeight + 160, behavior: "smooth" });
+    await new Promise(res => setTimeout(res, per));
+  }
+};
+window.findEvent = (text, from = 0) => events.findIndex((e, i) => i >= from && e.title.includes(text));
+$("replay").onclick = () => replay(1);
+$("all").onclick = () => { replaying = false; render(events); };
+load().then(() => { if (location.hash === "#replay") replay(1.6); });
+setInterval(load, 2000);
+</script>
+</body>
+</html>

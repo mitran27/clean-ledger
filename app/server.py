@@ -48,6 +48,18 @@ def index() -> FileResponse:
     return FileResponse(Path(__file__).parent / "static" / "index.html")
 
 
+@app.get("/log")
+def log_page() -> FileResponse:
+    return FileResponse(Path(__file__).parent / "static" / "log.html")
+
+
+@app.get("/api/events")
+def events_api() -> list[dict]:
+    """The latest investigation's event log (public material only: keys, hashes, verdicts)."""
+    import events
+    return events.read()
+
+
 @app.get("/api/status")
 def status() -> dict:
     tx = ledger.transactions()

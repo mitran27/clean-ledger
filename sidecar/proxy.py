@@ -27,6 +27,7 @@ sys.path.insert(0, str(ROOT / "sidecar"))
 sys.path.insert(0, str(ROOT / "_tools"))
 import attest  # noqa: E402
 import call_model  # noqa: E402
+from events import emit, short  # noqa: E402
 
 PROOFS = ROOT / "sidecar" / "proofs.jsonl"
 app = FastAPI(title="Clean Ledger attestation sidecar")
@@ -86,7 +87,13 @@ def handle(body: bytes, hdrs: dict | None = None) -> Response:
     except (ValueError, KeyError):
         raise HTTPException(400, "body must be JSON with a model")
     rule = call_model.POLICY["models"].get(model)
+    enc = "x-model-pub-key" in hdrs
+    emit("crypto" if enc else "model", "sidecar", f"Request for {model} received from the agent",
+         because="the agent only talks to the local sidecar, which holds the API key",
+         status="info", encrypted=enc, bytes=len(body), all_fields_encrypted=hdrs.get("x-encrypt-all-fields") == "true")
     if not rule or rule["tier"] not in TEE_TIERS:
+        emit("model", "sidecar", f"Refused: {model} is not a TEE-tier model", status="fail",
+             because="policy.json only allows customer data to attested TEE models")
         raise HTTPException(403, f"{model}: not a TEE-tier model in policy; sidecar will not carry customer data to it")
     k = key()
     att = attest.verify_model(model, k)
@@ -94,8 +101,16 @@ def handle(body: bytes, hdrs: dict | None = None) -> Response:
         return JSONResponse({"error": "attestation failed; nothing was sent", "checks": att["checks"]}, status_code=412)
     pinned = hdrs.get("x-model-pub-key")
     if pinned and pinned not in att["signing_addresses"]:  # encryption must target a hardware-bound key
+        emit("key", "sidecar", "Pinned key is NOT the registered key: blocked", status="fail",
+             because="the agent encrypted to a key the hardware did not vouch for", pinned=short(pinned, 20))
         return JSONResponse({"error": "pinned model key is not an attested key for this model; nothing was sent"},
                             status_code=412)
+    if pinned:
+        emit("key", "sidecar", "Pinned key matches the registered model key",
+             because="the agent encrypted to exactly the key the sidecar verified", public_key=short(pinned, 20))
+    emit("model", "sidecar", "Forwarded to NEAR AI Cloud with x-no-aliasing",
+         because="attestation passed; the gateway may not swap the model and sees only ciphertext",
+         status="info", endpoint="POST /v1/chat/completions")
     req = urllib.request.Request(attest.BASE + "/chat/completions", data=body, method="POST")
     req.add_header("Authorization", f"Bearer {k}")
     req.add_header("Content-Type", "application/json")
@@ -118,8 +133,13 @@ def handle(body: bytes, hdrs: dict | None = None) -> Response:
                 continue
             return JSONResponse({"error": f"upstream unreachable after 3 tries: {e}"}, status_code=502)
     chat_id = json.loads(resp_bytes).get("id", "")
+    emit("model", "model TEE", f"{model} answered inside the TEE and signed its reply",
+         because="it decrypted the request with its private key, which never leaves the hardware",
+         status="info", chat_id=short(chat_id, 14), bytes=len(resp_bytes))
     sig = attest.verify_signature(chat_id, model, k, body, resp_bytes)
     if not sig["ok"]:
+        emit("sign", "sidecar", "Response DROPPED: signature check failed", status="fail",
+             because="an unsigned or altered response must never reach the agent")
         return JSONResponse({"error": "response signature invalid; response dropped", "checks": sig["checks"]}, status_code=502)
     record = {"ts": int(time.time()), "chat_id": chat_id, "model": model, "tier": rule["tier"],
               "attestation_jti": att["jti"], "tcb_status": att["tcb_status"], "gpu_ok": att["gpu_ok"],

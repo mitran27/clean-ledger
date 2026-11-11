@@ -9,3 +9,4 @@ stages/*/output/*
 .cache/
 memory/
 sidecar/proofs.jsonl
+logs/

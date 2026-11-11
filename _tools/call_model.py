@@ -18,6 +18,9 @@ import urllib.request
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from events import emit, short  # noqa: E402
+
 POLICY = json.loads((ROOT / "_shared" / "policy.json").read_text())
 AGENT_MODEL = "z-ai/glm-5.3-flash"
 SCREEN_MODEL = "typesafe/jev-1.13"
@@ -170,9 +173,21 @@ def secure_chat(messages: list[dict], tools: list | None = None, models: list[st
             continue
         try:
             check_policy(model, raw=True)
+            emit("model", "agent", f"Using {model}", status="info",
+                 because=f"{'first healthy' if not errors else 'next'} model in the attested failover pool",
+                 skipped=errors or None)
             att = _attest(base, model)
+            emit("key", "agent", "Registered model key received from the sidecar",
+                 because="the sidecar attested the TEE and bound this key to the hardware",
+                 public_key=short(att["signing_addresses"][0], 20))
             s = e2ee.Session(att["signing_addresses"][0])
+            emit("key", "agent", "Client key pair created for this call",
+                 because="the model encrypts its reply to this key; the private half never leaves this process",
+                 client_public_key=short(s.client_pub_hex, 20))
             body = {"model": model, "messages": to_wire(messages, s), **extra}
+            emit("crypto", "agent", f"Encrypted {len(messages)} messages end to end",
+                 because="X25519 + XChaCha20-Poly1305 to the registered model key; only that TEE can read them",
+                 tool_definitions_plain=bool(tools), tool_calls_encrypted=all_fields)
             if tools:
                 body["tools"] = tools
                 body.setdefault("tool_choice", "auto")
@@ -180,6 +195,10 @@ def secure_chat(messages: list[dict], tools: list | None = None, models: list[st
                 body.setdefault("chat_template_kwargs", {"enable_thinking": False})
             resp = via_sidecar(base, body, s.headers(all_fields))
             _decrypt_message(resp["choices"][0]["message"], s, all_fields)
+            msg = resp["choices"][0]["message"]
+            emit("crypto", "agent", "Reply decrypted locally with the client private key",
+                 because="the model encrypted its answer to our client public key",
+                 tool_calls=len(msg.get("tool_calls") or []), text_chars=len(msg.get("content") or ""))
             resp["_model"], resp["_e2ee"] = model, True
             _breaker.pop(model, None)
             return resp
@@ -187,6 +206,8 @@ def secure_chat(messages: list[dict], tools: list | None = None, models: list[st
             fails += 1
             _breaker[model] = (fails, time.time() + 60 if fails >= 2 else 0.0)
             errors.append(f"{model}: {str(e)[:160]}")
+            emit("model", "agent", f"{model} unavailable, failing over", status="warn",
+                 because=str(e)[:160], circuit_open=fails >= 2)
     raise SystemExit("No attested model answered: " + " | ".join(errors))
 
 

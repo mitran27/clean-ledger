@@ -18,6 +18,7 @@ import ledger  # noqa: E402
 import memory  # noqa: E402
 import guard  # noqa: E402
 import proofchain  # noqa: E402
+from events import emit, reset as reset_events  # noqa: E402
 from call_model import AGENT_MODEL, POLICY, PolicyError, secure_chat  # noqa: E402
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -144,6 +145,7 @@ def investigate(account: str) -> None:
         with trace_path.open("a") as f:
             f.write(json.dumps(entry) + "\n")
 
+    reset_events()  # the Flow Log shows the latest investigation
     chain = proofchain.Chain(OUT / f"{case}.chain.jsonl")
     done_calls: set = set()  # (tool, args) already executed, so relayed text echoes don't re-run
 
@@ -151,7 +153,11 @@ def investigate(account: str) -> None:
         write_result(case, result, response_ids, proofs)
         proofchain.build_receipt(case)
 
+    emit("info", "agent", f"Investigation of {account} started",
+         because="screening escalated this account (fan-in, pass-through, offshore wire)", case=case)
     for step in range(1, MAX_STEPS + 1):
+        emit("info", "agent", f"Step {step}: asking the model what to do next", status="step",
+             because="the agent decides each next step from what it found so far", messages=len(messages))
         r = secure_chat(messages, tools=TOOL_SCHEMAS)  # E2EE, attested model, failover pool
         response_ids.append(r.get("id"))
         proof = r.get("_proof")
@@ -163,8 +169,15 @@ def investigate(account: str) -> None:
             calls = _text_tool_calls(msg.get("content") or "", step, done_calls)
             if calls:
                 msg = {**msg, "tool_calls": calls}
+                emit("info", "agent", "Tool call read from the model's signed text", status="info",
+                     because="NEAR's encrypted path relays tool results as text, so the model sometimes answers in text")
         # Signed-tool gate: nothing from this response may act unless its TEE signature and byte hashes verify.
         gate = proofchain.verify_step(proof)
+        names = [c["function"]["name"] for c in calls]
+        emit("gate", "agent", "Signed-tool gate PASSED: tools may run" if not gate else "Signed-tool gate REFUSED",
+             status="ok" if not gate else "fail",
+             because="the agent re-verified the TEE signature over the exact bytes it sent and received"
+             if not gate else "; ".join(gate), requested=names or None)
         rec = {"step": step, "chat_id": (proof or {}).get("chat_id"), "model": r.get("_model"), "e2ee": r.get("_e2ee", False),
                **{k: (proof or {}).get(k) for k in ("request_sha256", "response_sha256", "signed_text",
                                                     "signature", "signing_address")},
@@ -189,6 +202,8 @@ def investigate(account: str) -> None:
             if name == "finish":
                 problems = validate_finish(args)
                 if problems:  # send the errors back so the model fixes its own answer
+                    emit("tool", "agent", "Final answer rejected, sent back to the model to fix", status="warn",
+                         because="; ".join(problems)[:200])
                     log({"step": step, "tool": "finish", "rejected": problems})
                     rec["tool_results"].append({"name": "finish", "rejected": True})
                     messages.append({"role": "tool", "tool_call_id": c["id"],
@@ -197,6 +212,9 @@ def investigate(account: str) -> None:
                 log({"step": step, "tool": "finish", "args": {k: v for k, v in args.items()
                                                                if k != "findings_markdown"}})
                 rec["tool_results"].append({"name": "finish", "accepted": True})
+                emit("tool", "agent", f"SAR drafted, {len(args['proposed_actions'])} actions proposed",
+                     because="every target and cited transaction id exists in the ledger",
+                     risk=args.get("risk"), actions=[f"{a['action']} {a['target']}" for a in args["proposed_actions"]])
                 chain.add(rec)
                 second_opinion(args, chain, log, response_ids, proofs)
                 return finish_case(args)
@@ -205,6 +223,13 @@ def investigate(account: str) -> None:
             else:
                 result = TOOLS[name](**args) if name in TOOLS else {"error": f"unknown tool {name}"}
             done_calls.add((name, json.dumps(args, sort_keys=True)))
+            emit("tool", "agent", f"Ran {name}({', '.join(str(v) for v in args.values())})",
+                 because="requested in a response that passed the signed-tool gate; tools are read-only",
+                 rows=len(result) if isinstance(result, list) else None)
+            if name == "search_past_cases" and isinstance(result, list) and result:
+                emit("memory", "agent", "Past cases recalled: " + ", ".join(f"{m['case_id']} ({m['similarity']})" for m in result),
+                     because="embeddings shortlisted similar closed cases locally, then the reranker ordered them",
+                     top=f"{result[0]['case_id']}: {result[0]['outcome']}")
             result, gflags = guard.sanitize(result)  # untrusted free text screened before the model sees it
             entry = {"step": step, "tool": name, "args": args, "result_size": len(json.dumps(result))}
             if gflags:
@@ -280,6 +305,9 @@ def second_opinion(args: dict, chain, log, response_ids: list, proofs: list) -> 
         agree = bool(verdict and verdict.get("agree") is True) and not gate
         p["second_opinion"] = {"model": r.get("_model"), "agree": agree,
                                "reason": str((verdict or {}).get("reason", "answer could not be parsed"))[:300]}
+        emit("review", "agent", f"Second opinion on freezing {p['target']}: {'AGREES, freeze approved' if agree else 'disagrees, freeze HELD'}",
+             status="ok" if agree else "warn", model=r.get("_model"), reason=p["second_opinion"]["reason"][:160],
+             because="a freeze needs an independent attested model from another vendor to agree")
         if not agree:
             p["held"] = True
         chain.add({"step": f"review-a{i}", "chat_id": (proof or {}).get("chat_id"), "model": r.get("_model"), "e2ee": True,

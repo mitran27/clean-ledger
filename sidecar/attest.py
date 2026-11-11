@@ -44,8 +44,32 @@ def _get(path: str, key: str | None = None) -> dict:
         return json.loads(r.read())
 
 
+try:
+    from events import emit, short
+except ImportError:  # running without _tools on the path: logging off
+    def emit(*a, **k): pass
+    def short(v, n=12): return v
+
+REASONS = [  # (substring of check name, colour kind, why this check exists)
+    ("token signed by Intel", "attest", "token signature verified with Intel Trust Authority's public keys (JWKS)"),
+    ("fresh nonce echoed", "attest", "Intel's signed claims contain the nonce we just sent, so the evidence is fresh"),
+    ("platform up to date", "attest", "TDX TCB status must match the allowed list in policy.json"),
+    ("debug disabled", "attest", "a debuggable TEE could expose its memory"),
+    ("NVIDIA GPU", "attest", "the model runs on the GPU, so the GPU must be attested too"),
+    ("bound in the TDX quote", "key", "quote report_data equals the model's public key plus our second nonce"),
+    ("Intel Trust Authority token available", "attest", "no Intel-signed evidence means the model cannot be trusted"),
+    ("provider_tee", "sign", "the signature must come from the model TEE, not just the gateway"),
+    ("ed25519 signature valid", "sign", "signature checked with the model's public key"),
+    ("signing key is the attested key", "sign", "the signer must be the key registered during attestation"),
+    ("signed model id matches", "sign", "the signed text names the model we asked for"),
+]
+
+
 def _check(checks: list, name: str, ok: bool, detail: str = "") -> bool:
     checks.append({"name": name, "ok": bool(ok), "detail": detail})
+    kind, why = next(((k, w) for s, k, w in REASONS if s in name), ("attest", None))
+    emit(kind, "sidecar", ("✓ " if ok else "✗ ") + name, because=why, status="ok" if ok else "fail",
+         info=detail or None)
     return bool(ok)
 
 
@@ -77,11 +101,20 @@ def verify_model(model: str, key: str | None = None, force: bool = False) -> dic
     """Attest the TEE that serves `model`. Cached until shortly before the ITA token expires."""
     hit = _cache.get(model)
     if hit and not force and hit["expires"] - time.time() > 30:
+        emit("attest", "sidecar", f"Attestation for {model} reused from cache",
+             because="verified earlier and still inside its validity window", status="info",
+             expires_in_s=int(hit["expires"] - time.time()), verified=hit["verified"])
         return hit
     checks: list = []
     nonce = os.urandom(32).hex()
+    emit("attest", "sidecar", f"Attesting {model}: fresh nonce generated",
+         because="before any data is sent, the hardware must prove itself with evidence made right now",
+         nonce=short(nonce, 16))
     try:
         ita = _get(f"/attestation/ita-token?model={urllib.parse.quote(model)}&nonce={nonce}")
+        emit("attest", "sidecar", "Intel Trust Authority tokens received",
+             because="the nonce was sent to GET /v1/attestation/ita-token", status="info",
+             tokens=1 + len(ita.get("models", [])), issuer="portal.trustauthority.intel.com")
     except Exception as e:  # no Intel-signed evidence for this model: fail closed, never crash
         _check(checks, "Intel Trust Authority token available", False, str(e)[:120])
         out = {"model": model, "verified": False, "checks": checks, "signing_addresses": [], "jti": None,
@@ -120,6 +153,9 @@ def verify_model(model: str, key: str | None = None, force: bool = False) -> dic
     try:
         n2 = os.urandom(32).hex()
         rep = _get(f"/attestation/report?model={urllib.parse.quote(model)}&nonce={n2}&signing_algo=ed25519", key)
+        emit("key", "sidecar", "Model attestation report received (TDX quote + public key)",
+             because="second nonce sent to GET /v1/attestation/report", status="info",
+             nonce=short(n2, 16), candidates=len(rep.get("model_attestations", [])))
         for a in rep.get("model_attestations", []):
             rd = quote_report_data(a["intel_quote"])
             bound = rd[:32] == bytes.fromhex(a["signing_address"]) and rd[32:64] == bytes.fromhex(n2)
@@ -128,6 +164,12 @@ def verify_model(model: str, key: str | None = None, force: bool = False) -> dic
     except Exception as e:
         _check(checks, "signing key bound in the TDX quote", False, str(e)[:120])
     verified = bool(checks) and all(c["ok"] for c in checks)
+    if verified:
+        for a in addresses:
+            emit("key", "sidecar", "Model key REGISTERED as trusted", because="every attestation check passed and "
+                 "the key is bound inside the hardware quote", model=model, public_key=short(a, 20))
+    emit("attest", "sidecar", f"{model}: attestation {'PASSED' if verified else 'FAILED, nothing will be sent'}",
+         because=f"{sum(c['ok'] for c in checks)} of {len(checks)} checks passed", status="ok" if verified else "fail")
     out = {"model": model, "verified": verified, "checks": checks, "signing_addresses": addresses,
            "jti": (claims.get("model") or claims.get("gateway") or {}).get("jti"),
            "tcb_status": claims.get("model", {}).get("tdx", {}).get("attester_tcb_status"),
@@ -158,6 +200,10 @@ def verify_signature(chat_id: str, model: str, key: str, request_bytes: bytes, r
     _check(checks, "signed model id matches", signed_model == model, signed_model)
     req_ok = req_h == hashlib.sha256(request_bytes).hexdigest()
     resp_ok = resp_h == hashlib.sha256(response_bytes).hexdigest()
+    emit("sign", "sidecar", "Request and response bytes match what the TEE signed" if req_ok and resp_ok
+         else "Byte hashes differ from the signed hashes", status="ok" if req_ok and resp_ok else "fail",
+         because="sha256 of the exact ciphertext bytes sent and received, compared with the signed text",
+         request_hash=short(req_h, 14), response_hash=short(resp_h, 14))
     return {"chat_id": chat_id, "ok": all(c["ok"] for c in checks), "checks": checks,
             "signing_address": sig["signing_address"], "signature": sig["signature"], "request_hash_matches": req_ok,
             "response_hash_matches": resp_ok, "signed_text": text}

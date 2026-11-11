@@ -66,7 +66,7 @@ def _cos(a: list[float], b: list[float]) -> float:
 
 def search(text: str, k: int = 3, pool: int = 6, exclude_case: str | None = None) -> list[dict]:
     import guard  # local import: guard -> call_model, no cycle
-    guard.assert_no_personal_data(text)  # customer names + NEAR privacy filter, before non-TEE models
+    guard.assert_no_personal_data(text, purpose="embeddings + rerank")  # names + NEAR privacy filter
     cases = [c for c in load_cases() if exclude_case is None or c.get("source_case") != exclude_case]
     if not cases:
         return []

@@ -6,3 +6,6 @@ __pycache__/
 .venv/
 stages/*/output/*
 !stages/*/output/.gitkeep
+.cache/
+memory/
+sidecar/proofs.jsonl

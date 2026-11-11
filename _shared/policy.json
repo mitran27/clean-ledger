@@ -1,12 +1,74 @@
 {
   "base_url": "https://cloud-api.near.ai/v1",
   "models": {
-    "z-ai/glm-5.3-flash":                    {"tier": "confidential", "allow_raw": true},
-    "deepseek-ai/DeepSeek-V4.1-Flash-1017":  {"tier": "confidential", "allow_raw": true},
-    "openai/privacy-filter":                 {"tier": "confidential", "allow_raw": true},
-    "deepseek/deepseek-v3.2":                {"tier": "attested-3p",  "allow_raw": false},
-    "typesafe/jev-1.13":                     {"tier": "unverified",   "allow_raw": false}
+    "z-ai/glm-5.3-flash": {
+      "tier": "confidential",
+      "allow_raw": true
+    },
+    "deepseek-ai/DeepSeek-V4.1-Flash-1017": {
+      "tier": "confidential",
+      "allow_raw": true,
+      "use": "failover + independent reviewer (E2EE and signatures tested)"
+    },
+    "openai/privacy-filter": {
+      "tier": "confidential",
+      "allow_raw": true
+    },
+    "deepseek/deepseek-v3.2": {
+      "tier": "attested-3p",
+      "allow_raw": false
+    },
+    "typesafe/jev-1.13": {
+      "tier": "unverified",
+      "allow_raw": false
+    },
+    "Qwen/Qwen3-Embedding-0.6B": {
+      "tier": "unverified",
+      "allow_raw": false,
+      "use": "embeddings for past-case memory"
+    },
+    "Qwen/Qwen3-Reranker-0.6B": {
+      "tier": "unverified",
+      "allow_raw": false,
+      "use": "rerank + score"
+    },
+    "levanto/sage-2": {
+      "tier": "unverified",
+      "allow_raw": false,
+      "use": "decision model (alternative to Jev)"
+    },
+    "z-ai/glm-5.3": {
+      "tier": "unverified",
+      "allow_raw": false,
+      "use": "excluded: no Intel Trust Authority token (tested 2026-11-11)"
+    },
+    "moonshotai/kimi-k3": {
+      "tier": "unverified",
+      "allow_raw": false,
+      "use": "excluded: no Intel Trust Authority token (tested 2026-11-11)"
+    },
+    "Qwen/Qwen3.8-27B": {
+      "tier": "confidential",
+      "allow_raw": true,
+      "use": "failover + independent reviewer (E2EE and signatures tested)"
+    }
+  },
+  "note": "unverified = TEE status not confirmed: pseudonymous text only (no names). Sidecar carries TEE-tier chat only.",
+  "attestation": {
+    "allowed_tcb_status": [
+      "UpToDate"
+    ],
+    "require_gpu": true,
+    "max_age_seconds": 240
   },
   "default_unknown": "deny",
-  "note": "Embedding and rerank model ids are added after the first API check."
+  "failover_pool": [
+    "z-ai/glm-5.3-flash",
+    "Qwen/Qwen3.8-27B",
+    "deepseek-ai/DeepSeek-V4.1-Flash-1017"
+  ],
+  "reviewer_pool": [
+    "Qwen/Qwen3.8-27B",
+    "deepseek-ai/DeepSeek-V4.1-Flash-1017"
+  ]
 }

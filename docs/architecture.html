@@ -1,0 +1,341 @@
+<title>Proof-Carrying Agent</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: one large architecture drawing, then a short key and a status table. Light only, matching the Clean Ledger app. */
+:root {
+  color-scheme: light;
+  --bg: #f4f7f6; --surface: #ffffff; --ink: #15211d; --muted: #5d6c66; --line: #c9d6d1;
+  --accent: #0e7a62; --accent-soft: #e3f2ed;      /* your machine, sidecar */
+  --violet: #5b4bb7; --violet-soft: #eeebfa;      /* NEAR AI Cloud TEEs */
+  --chain: #2a6fb8; --chain-soft: #e4eef9;        /* NEAR chain */
+  --warn: #a8690f; --warn-soft: #fbf0dc; --ok: #1d8a4b; --ok-soft: #e4f4ea;
+  --display: "Space Grotesk", "Segoe UI", system-ui, sans-serif;
+  --body: "Inter", system-ui, -apple-system, sans-serif;
+  --mono: "JetBrains Mono", ui-monospace, Menlo, monospace;
+}
+* { box-sizing: border-box; }
+body { background: var(--bg); color: var(--ink); font: 14px/1.55 var(--body); }
+.wrap { max-width: 1240px; margin: 0 auto; padding-block: 28px 56px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
+  display: grid; gap: 22px; }
+h1, h2 { font-family: var(--display); margin: 0; letter-spacing: -0.01em; text-wrap: balance; }
+h1 { font-size: 28px; } h2 { font-size: 17px; }
+p { margin: 0; max-width: 72ch; }
+.muted { color: var(--muted); }
+.eyebrow { font: 600 11px/1 var(--body); letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+.panel { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 18px 20px; display: grid; gap: 14px; min-width: 0; }
+.drawing { overflow-x: auto; }
+.drawing svg { display: block; width: 100%; min-width: 960px; height: auto; }
+.two { display: grid; grid-template-columns: 1.15fr 1fr; gap: 18px; }
+ol.key { margin: 0; padding-left: 20px; display: grid; gap: 7px; }
+ol.key b { font-family: var(--display); }
+table { width: 100%; border-collapse: collapse; font-size: 13px; }
+th { text-align: left; font: 600 11px/1 var(--body); letter-spacing: .06em; text-transform: uppercase; color: var(--muted); padding: 8px 10px; border-bottom: 1px solid var(--line); }
+td { padding: 8px 10px; border-bottom: 1px solid var(--line); vertical-align: top; }
+tr:last-child td { border-bottom: 0; }
+.pill { display: inline-block; padding: 2px 9px; border-radius: 999px; font: 500 11.5px/1.5 var(--body); white-space: nowrap; }
+.ok { color: var(--ok); background: var(--ok-soft); } .warn { color: var(--warn); background: var(--warn-soft); } .plain { color: var(--muted); background: var(--bg); }
+@media (max-width: 860px) { .two { grid-template-columns: minmax(0, 1fr); } }
+</style>
+
+<div class="wrap">
+  <header style="display:grid;gap:6px">
+    <span class="eyebrow">Clean Ledger · proposed architecture</span>
+    <h1>Proof-Carrying Agent</h1>
+    <p class="muted">Every step of the investigation carries a proof: what each model was allowed to see, which tool calls it asked for, and that every action traces back to a signed step inside verified hardware.</p>
+  </header>
+
+  <section class="panel">
+    <div class="drawing">
+<svg viewBox="0 52 1200 748" role="img" aria-label="Proof-carrying agent architecture: your machine, NEAR AI Cloud and NEAR chain" font-family="Inter, system-ui, sans-serif" font-size="13">
+  <defs>
+    <marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="#7d8c86"/></marker>
+  </defs>
+
+  <!-- zones -->
+  <rect x="24" y="64" width="776" height="726" rx="16" fill="#eaf3ef" stroke="#0e7a62" stroke-width="1.5" stroke-dasharray="6 5"/>
+  <text x="44" y="90" font-size="12" font-weight="600" letter-spacing="1.2" fill="#0e7a62">YOUR MACHINE · PLAINTEXT LIVES ONLY HERE</text>
+  <rect x="836" y="64" width="340" height="574" rx="16" fill="#efedf9" stroke="#5b4bb7" stroke-width="1.5"/>
+  <text x="856" y="90" font-size="12" font-weight="600" letter-spacing="1.2" fill="#5b4bb7">NEAR AI CLOUD · ATTESTED TEEs</text>
+  <rect x="836" y="648" width="340" height="142" rx="16" fill="#e4eef9" stroke="#2a6fb8" stroke-width="1.5"/>
+  <text x="856" y="672" font-size="12" font-weight="600" letter-spacing="1.2" fill="#2a6fb8">NEAR CHAIN</text>
+
+  <!-- connectors -->
+  <g fill="none" stroke="#7d8c86" stroke-width="1.4">
+    <path d="M268 145H290" marker-end="url(#ar)"/>
+    <path d="M512 145H534" marker-end="url(#ar)"/>
+    <path d="M402 182V198H158V212" stroke-dasharray="4 4" marker-end="url(#ar)"/>
+    <path d="M658 182V212" marker-end="url(#ar)"/>
+    <path d="M536 251H514" marker-end="url(#ar)"/>
+    <path d="M402 288V318" marker-end="url(#ar)"/>
+    <path d="M658 288V318" marker-end="url(#ar)"/>
+    <path d="M268 366H290" marker-end="url(#ar)"/>
+    <path d="M402 412V438" marker-end="url(#ar)"/>
+    <path d="M292 477H270" marker-end="url(#ar)"/>
+    <path d="M512 477H534" marker-end="url(#ar)"/>
+    <path d="M402 514V544" marker-end="url(#ar)"/>
+    <path d="M292 583H270" marker-end="url(#ar)"/>
+    <path d="M158 620V636H402V650" marker-end="url(#ar)"/>
+    <path d="M780 495H794V638H700V650" marker-end="url(#ar)"/>
+    <path d="M512 689H534" marker-end="url(#ar)"/>
+    <!-- to the cloud and the chain -->
+    <path d="M780 145H850" marker-end="url(#ar)" stroke="#5b4bb7"/>
+    <path d="M780 366H850" marker-start="url(#ar)" marker-end="url(#ar)" stroke="#5b4bb7" stroke-width="2.2"/>
+    <path d="M780 583H850" marker-start="url(#ar)" marker-end="url(#ar)" stroke="#5b4bb7"/>
+    <path d="M1006 329V298" marker-end="url(#ar)" stroke="#5b4bb7"/>
+    <path d="M780 700H850" marker-end="url(#ar)" stroke="#2a6fb8"/>
+  </g>
+  <g font-size="10.5" fill="#5d6c66" text-anchor="middle">
+    <text x="816" y="138">numbers</text>
+    <text x="816" y="358" font-weight="600" fill="#5b4bb7">ciphertext</text>
+    <text x="816" y="575">encrypted</text>
+    <text x="816" y="692">hashes</text>
+    <text x="280" y="210" text-anchor="start">token map</text>
+  </g>
+
+  <!-- row 1 -->
+  <g><rect x="48" y="108" width="220" height="74" rx="9" fill="#ffffff" stroke="#c9d6d1"/>
+    <text x="62" y="132" font-weight="600" fill="#15211d">Raw case data</text>
+    <text x="62" y="150" font-size="11.5" fill="#5d6c66">names, accounts, transactions</text>
+    <text x="62" y="166" font-size="11.5" fill="#5d6c66">synthetic in the demo</text></g>
+  <g><rect x="292" y="108" width="220" height="74" rx="9" fill="#ffffff" stroke="#c9d6d1"/>
+    <circle cx="308" cy="128" r="9" fill="#0e7a62"/><text x="308" y="132" font-size="11" font-weight="700" fill="#ffffff" text-anchor="middle">1</text>
+    <text x="324" y="132" font-weight="600" fill="#15211d">Pseudonymizer</text>
+    <text x="306" y="150" font-size="11.5" fill="#5d6c66">names → tokens, locally</text>
+    <text x="306" y="166" font-size="11.5" fill="#5d6c66">PERSON_1, BUSINESS_2 …</text></g>
+  <g><rect x="536" y="108" width="244" height="74" rx="9" fill="#ffffff" stroke="#c9d6d1"/>
+    <circle cx="552" cy="128" r="9" fill="#0e7a62"/><text x="552" y="132" font-size="11" font-weight="700" fill="#ffffff" text-anchor="middle">2</text>
+    <text x="568" y="132" font-weight="600" fill="#15211d">Cascade router</text>
+    <text x="550" y="150" font-size="11.5" fill="#5d6c66">Jev scores every account</text>
+    <text x="550" y="166" font-size="11.5" fill="#5d6c66">confidence decides escalation</text></g>
+
+  <!-- row 2 -->
+  <g><rect x="48" y="214" width="220" height="74" rx="9" fill="#ffffff" stroke="#0e7a62" stroke-dasharray="5 4"/>
+    <text x="62" y="238" font-weight="600" fill="#15211d">Token vault</text>
+    <text x="62" y="256" font-size="11.5" fill="#5d6c66">token ↔ name map</text>
+    <text x="62" y="272" font-size="11.5" fill="#5d6c66">never leaves this machine</text></g>
+  <g><rect x="292" y="214" width="220" height="74" rx="9" fill="#ffffff" stroke="#c9d6d1"/>
+    <text x="306" y="238" font-weight="600" fill="#15211d">Agent: analyst</text>
+    <text x="306" y="256" font-size="11.5" fill="#5d6c66">sees real details for one step</text>
+    <text x="306" y="272" font-size="11.5" fill="#5d6c66">only when it must</text></g>
+  <g><rect x="536" y="214" width="244" height="74" rx="9" fill="#ffffff" stroke="#c9d6d1"/>
+    <text x="550" y="238" font-weight="600" fill="#15211d">Agent: planner</text>
+    <text x="550" y="256" font-size="11.5" fill="#5d6c66">sees the pseudonymous graph</text>
+    <text x="550" y="272" font-size="11.5" fill="#5d6c66">decides what to look at next</text></g>
+
+  <!-- row 3 -->
+  <g><rect x="48" y="320" width="220" height="92" rx="9" fill="#ffffff" stroke="#c9d6d1"/>
+    <text x="62" y="344" font-weight="600" fill="#15211d">Verification policy</text>
+    <text x="62" y="362" font-size="11.5" fill="#5d6c66">what counts as verified</text>
+    <text x="62" y="378" font-size="11.5" fill="#5d6c66">fail closed on any gap</text>
+    <text x="62" y="394" font-size="11.5" fill="#5d6c66">its hash goes in the receipt</text></g>
+  <g><rect x="292" y="320" width="488" height="92" rx="9" fill="#e3f2ed" stroke="#0e7a62" stroke-width="2"/>
+    <circle cx="308" cy="340" r="9" fill="#0e7a62"/><text x="308" y="344" font-size="11" font-weight="700" fill="#ffffff" text-anchor="middle">3</text>
+    <text x="324" y="344" font-weight="600" fill="#15211d">Attestation sidecar · holds the only API key</text>
+    <text x="306" y="362" font-size="11.5" fill="#15211d">Before: verify gateway + model TEE (Intel token, GPU, fresh nonce)</text>
+    <text x="306" y="378" font-size="11.5" fill="#15211d">Send: encrypt end-to-end to the attested model key</text>
+    <text x="306" y="394" font-size="11.5" fill="#15211d">After: verify the TEE signature over request and response</text></g>
+
+  <!-- row 4 -->
+  <g><rect x="48" y="440" width="220" height="74" rx="9" fill="#ffffff" stroke="#c9d6d1"/>
+    <text x="62" y="464" font-weight="600" fill="#15211d">Local tools</text>
+    <text x="62" y="482" font-size="11.5" fill="#5d6c66">transactions, trace money,</text>
+    <text x="62" y="498" font-size="11.5" fill="#5d6c66">account profile</text></g>
+  <g><rect x="292" y="440" width="220" height="74" rx="9" fill="#ffffff" stroke="#c9d6d1"/>
+    <circle cx="308" cy="460" r="9" fill="#0e7a62"/><text x="308" y="464" font-size="11" font-weight="700" fill="#ffffff" text-anchor="middle">4</text>
+    <text x="324" y="464" font-weight="600" fill="#15211d">Signed-tool gate</text>
+    <text x="306" y="482" font-size="11.5" fill="#5d6c66">runs a tool only if the step</text>
+    <text x="306" y="498" font-size="11.5" fill="#5d6c66">asking for it is TEE-signed</text></g>
+  <g><rect x="536" y="440" width="244" height="74" rx="9" fill="#ffffff" stroke="#c9d6d1"/>
+    <circle cx="552" cy="460" r="9" fill="#0e7a62"/><text x="552" y="464" font-size="11" font-weight="700" fill="#ffffff" text-anchor="middle">5</text>
+    <text x="568" y="464" font-weight="600" fill="#15211d">Transcript chain</text>
+    <text x="550" y="482" font-size="11.5" fill="#5d6c66">hash of every step, linked</text>
+    <text x="550" y="498" font-size="11.5" fill="#5d6c66">to the step before it</text></g>
+
+  <!-- row 5 -->
+  <g><rect x="48" y="546" width="220" height="74" rx="9" fill="#ffffff" stroke="#c9d6d1"/>
+    <text x="62" y="570" font-weight="600" fill="#15211d">Re-identify SAR</text>
+    <text x="62" y="588" font-size="11.5" fill="#5d6c66">tokens → names, locally</text>
+    <text x="62" y="604" font-size="11.5" fill="#5d6c66">for the analyst only</text></g>
+  <g><rect x="292" y="546" width="220" height="74" rx="9" fill="#ffffff" stroke="#c9d6d1"/>
+    <text x="306" y="570" font-weight="600" fill="#15211d">Egress firewall</text>
+    <text x="306" y="588" font-size="11.5" fill="#5d6c66">privacy/classify on output</text>
+    <text x="306" y="604" font-size="11.5" fill="#5d6c66">before anything leaves</text></g>
+  <g><rect x="536" y="546" width="244" height="74" rx="9" fill="#ffffff" stroke="#c9d6d1"/>
+    <circle cx="552" cy="566" r="9" fill="#0e7a62"/><text x="552" y="570" font-size="11" font-weight="700" fill="#ffffff" text-anchor="middle">6</text>
+    <text x="568" y="570" font-weight="600" fill="#15211d">Private memory</text>
+    <text x="550" y="588" font-size="11.5" fill="#5d6c66">encrypted embeddings,</text>
+    <text x="550" y="604" font-size="11.5" fill="#5d6c66">ranking done locally</text></g>
+
+  <!-- row 6 -->
+  <g><rect x="48" y="652" width="220" height="74" rx="9" fill="#ffffff" stroke="#0e7a62" stroke-dasharray="5 4"/>
+    <text x="62" y="676" font-weight="600" fill="#15211d">Per-case key</text>
+    <text x="62" y="694" font-size="11.5" fill="#5d6c66">delete it and the case</text>
+    <text x="62" y="710" font-size="11.5" fill="#5d6c66">data is unreadable</text></g>
+  <g><rect x="292" y="652" width="220" height="74" rx="9" fill="#ffffff" stroke="#c9d6d1"/>
+    <text x="306" y="676" font-weight="600" fill="#15211d">Outbox</text>
+    <text x="306" y="694" font-size="11.5" fill="#5d6c66">each action exactly once</text>
+    <text x="306" y="710" font-size="11.5" fill="#5d6c66">SAR, freeze, request info</text></g>
+  <g><rect x="536" y="652" width="244" height="74" rx="9" fill="#ffffff" stroke="#c9d6d1"/>
+    <circle cx="552" cy="672" r="9" fill="#0e7a62"/><text x="552" y="676" font-size="11" font-weight="700" fill="#ffffff" text-anchor="middle">7</text>
+    <text x="568" y="676" font-weight="600" fill="#15211d">Case receipt</text>
+    <text x="550" y="694" font-size="11.5" fill="#5d6c66">proofs, policy hash, chain head</text>
+    <text x="550" y="710" font-size="11.5" fill="#5d6c66">no customer data inside</text></g>
+  <text x="48" y="762" font-size="11.5" fill="#5d6c66">Solid arrows: data flow. Dashed: stays local. Purple: leaves the machine, encrypted or as numbers only.</text>
+
+  <!-- NEAR AI Cloud -->
+  <g><rect x="852" y="108" width="308" height="74" rx="9" fill="#ffffff" stroke="#5b4bb7"/>
+    <text x="866" y="132" font-weight="600" fill="#15211d">Jev decisions · /v1/systemone</text>
+    <text x="866" y="150" font-size="11.5" fill="#5d6c66">typed choice + confidence, ~0.2 s</text>
+    <text x="866" y="166" font-size="11.5" fill="#5d6c66">receives counts and amounts only</text></g>
+  <g><rect x="852" y="200" width="308" height="98" rx="9" fill="#ffffff" stroke="#5b4bb7" stroke-width="2"/>
+    <text x="866" y="224" font-weight="600" fill="#15211d">Model TEEs (Intel TDX + NVIDIA GPU)</text>
+    <text x="866" y="242" font-size="11.5" fill="#5d6c66">GLM-5.3 · Kimi K3 · Qwen 3.8, all attested</text>
+    <text x="866" y="258" font-size="11.5" fill="#5d6c66">decrypt only inside, sign every answer</text>
+    <text x="866" y="274" font-size="11.5" fill="#5d6c66">tool calls come back to your machine</text></g>
+  <g><rect x="852" y="329" width="308" height="74" rx="9" fill="#ffffff" stroke="#5b4bb7"/>
+    <text x="866" y="353" font-weight="600" fill="#15211d">Gateway TEE</text>
+    <text x="866" y="371" font-size="11.5" fill="#5d6c66">routes requests, sees ciphertext only</text>
+    <text x="866" y="387" font-size="11.5" fill="#5d6c66">evidence signed by Intel Trust Authority</text></g>
+  <g><rect x="852" y="425" width="308" height="74" rx="9" fill="#ffffff" stroke="#5b4bb7"/>
+    <text x="866" y="449" font-weight="600" fill="#15211d">Privacy filter · /v1/privacy</text>
+    <text x="866" y="467" font-size="11.5" fill="#5d6c66">classify and redact personal data</text>
+    <text x="866" y="483" font-size="11.5" fill="#5d6c66">backs the egress firewall</text></g>
+  <g><rect x="852" y="546" width="308" height="74" rx="9" fill="#ffffff" stroke="#5b4bb7"/>
+    <text x="866" y="570" font-weight="600" fill="#15211d">Embeddings + rerank</text>
+    <text x="866" y="588" font-size="11.5" fill="#5d6c66">encrypted embeddings in</text>
+    <text x="866" y="604" font-size="11.5" fill="#5d6c66">rerank sees tokens, never names</text></g>
+
+  <!-- NEAR chain -->
+  <g><rect x="852" y="684" width="308" height="44" rx="9" fill="#ffffff" stroke="#2a6fb8"/>
+    <text x="866" y="704" font-weight="600" fill="#15211d">Anchor contract</text>
+    <text x="866" y="720" font-size="11.5" fill="#5d6c66">receipt hash + policy hash, timestamped</text></g>
+  <g><rect x="852" y="738" width="308" height="40" rx="9" fill="#ffffff" stroke="#2a6fb8"/>
+    <text x="866" y="763" font-size="12" fill="#15211d"><tspan font-weight="600">NEP-413</tspan> · operator signs each executed action</text></g>
+</svg>
+    </div>
+  </section>
+
+  <section class="two">
+    <div class="panel">
+      <h2>What the numbers mean</h2>
+      <ol class="key">
+        <li><b>Pseudonymizer.</b> Names become tokens before anything leaves. The map stays in a local vault.</li>
+        <li><b>Cascade router.</b> Jev scores every account in about 0.2 s. Only confident escalations reach the expensive TEE agent.</li>
+        <li><b>Attestation sidecar.</b> Verifies the hardware before sending, encrypts to the attested model key, verifies the signature after. Fails closed.</li>
+        <li><b>Signed-tool gate.</b> A tool runs only when the model response asking for it carries a valid TEE signature. Forged instructions can't act.</li>
+        <li><b>Transcript chain.</b> Each step's hashes link to the previous step, so any edit to the investigation is detectable.</li>
+        <li><b>Private memory.</b> Past cases are embedded encrypted and ranked locally. "Matches closed CASE-012."</li>
+        <li><b>Case receipt.</b> Proofs, the policy hash and the chain head, anchored on NEAR. An examiner can re-verify it offline.</li>
+      </ol>
+    </div>
+    <div class="panel">
+      <h2>What's proven today</h2>
+      <table>
+        <thead><tr><th>Piece</th><th>Status</th></tr></thead>
+        <tbody>
+          <tr><td>Attestation, signatures, request/response hash match</td><td><span class="pill ok">tested live</span></td></tr>
+          <tr><td>Jev screening, embeddings, rerank, past-case memory</td><td><span class="pill ok">tested live</span></td></tr>
+          <tr><td>Agent with local tools, outbox exactly once</td><td><span class="pill ok">tested live</span></td></tr>
+          <tr><td>Signed-tool gate, transcript chain, case receipt, tamper tests</td><td><span class="pill ok">tested live</span></td></tr>
+          <tr><td>End-to-end encryption, full agent run (6 of 6 calls)</td><td><span class="pill ok">tested live, tool results via relay</span></td></tr>
+          <tr><td>Injection guard, privacy gate, two-model rule, attested failover</td><td><span class="pill ok">tested live</span></td></tr>
+          <tr><td>Pseudonymizer, encrypted embeddings</td><td><span class="pill plain">to build</span></td></tr>
+          <tr><td>Anchor contract, NEP-413 signing</td><td><span class="pill plain">to build</span></td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <header style="display:grid;gap:6px;margin-top:10px">
+    <span class="eyebrow">Security extension</span>
+    <h2 style="font-size:22px">Six layers of defense, each built on a NEAR AI API</h2>
+    <p class="muted">Each layer stops a different attack, so one failure does not expose the case. The reliability layer keeps the agent running without ever falling back to a weaker model.</p>
+  </header>
+
+  <section class="panel">
+    <div class="drawing">
+<svg viewBox="0 0 1200 470" role="img" aria-label="Six security layers, outermost first: connection, attestation policy, confidentiality, input safety, integrity, reliability" font-family="Inter, system-ui, sans-serif" font-size="12.5">
+  <text x="24" y="20" font-size="11" font-weight="600" letter-spacing="1.2" fill="#5d6c66">OUTSIDE</text>
+  <text x="300" y="20" font-size="11" font-weight="600" letter-spacing="1.2" fill="#5d6c66">CONTROLS</text>
+  <text x="944" y="20" font-size="11" font-weight="600" letter-spacing="1.2" fill="#5d6c66">NEAR API</text>
+
+  <g><rect x="24" y="32" width="1152" height="62" rx="10" fill="#ffffff" stroke="#c9d6d1"/>
+    <text x="44" y="58" font-size="14" font-weight="600" fill="#15211d">1 · Connection</text>
+    <text x="44" y="78" font-size="11.5" fill="#5d6c66">stops interception and rerouting</text>
+    <text x="300" y="58" fill="#15211d">TLS bound to the attestation report · no silent model aliasing</text>
+    <text x="300" y="78" fill="#15211d">model key pinned per session · OHTTP to hide request metadata</text>
+    <text x="944" y="68" font-family="JetBrains Mono, monospace" font-size="11.5" fill="#5b4bb7">/v1/attestation/report</text></g>
+
+  <g><rect x="24" y="102" width="1152" height="62" rx="10" fill="#f6f4fc" stroke="#c9d6d1"/>
+    <text x="44" y="128" font-size="14" font-weight="600" fill="#15211d">2 · Attestation policy</text>
+    <text x="44" y="148" font-size="11.5" fill="#5d6c66">stops fake or stale hardware</text>
+    <text x="300" y="128" fill="#15211d">gateway + every model candidate · fresh nonce · evidence under 4 minutes old</text>
+    <text x="300" y="148" fill="#15211d">Intel enforces our policy (ITA policy ids) · GPU required · re-attest on key change</text>
+    <text x="944" y="138" font-family="JetBrains Mono, monospace" font-size="11.5" fill="#5b4bb7">/v1/attestation/ita-token</text></g>
+
+  <g><rect x="24" y="172" width="1152" height="62" rx="10" fill="#efedf9" stroke="#c9d6d1"/>
+    <text x="44" y="198" font-size="14" font-weight="600" fill="#15211d">3 · Confidentiality</text>
+    <text x="44" y="218" font-size="11.5" fill="#5d6c66">stops anyone reading the data</text>
+    <text x="300" y="198" fill="#15211d">end-to-end encryption on every field · names pseudonymized before sending</text>
+    <text x="300" y="218" fill="#15211d">egress privacy filter on every output · per-case key, delete to shred</text>
+    <text x="944" y="208" font-family="JetBrains Mono, monospace" font-size="11.5" fill="#5b4bb7">E2EE chat · /v1/privacy/*</text></g>
+
+  <g><rect x="24" y="242" width="1152" height="62" rx="10" fill="#e3f2ed" stroke="#0e7a62" stroke-width="2"/>
+    <text x="44" y="268" font-size="14" font-weight="600" fill="#15211d">4 · Input safety · new</text>
+    <text x="44" y="288" font-size="11.5" fill="#5d6c66">stops a memo hijacking the agent</text>
+    <text x="300" y="268" fill="#15211d">injection guard on every tool result before the agent sees it (~0.2 s each)</text>
+    <text x="300" y="288" fill="#15211d">read-only tool allow-list · argument checks against the ledger · step budget</text>
+    <text x="944" y="278" font-family="JetBrains Mono, monospace" font-size="11.5" fill="#5b4bb7">/v1/systemone (Jev)</text></g>
+
+  <g><rect x="24" y="312" width="1152" height="62" rx="10" fill="#e3f2ed" stroke="#c9d6d1"/>
+    <text x="44" y="338" font-size="14" font-weight="600" fill="#15211d">5 · Integrity</text>
+    <text x="44" y="358" font-size="11.5" fill="#5d6c66">stops forged actions and later edits</text>
+    <text x="300" y="338" fill="#15211d">signed-tool gate, model-TEE signatures only · transcript hash chain</text>
+    <text x="300" y="358" fill="#15211d">case receipt anchored on NEAR · operator signs each action with NEP-413</text>
+    <text x="944" y="348" font-family="JetBrains Mono, monospace" font-size="11.5" fill="#5b4bb7">/v1/signature · NEAR chain</text></g>
+
+  <g><rect x="24" y="382" width="1152" height="62" rx="10" fill="#e4eef9" stroke="#2a6fb8"/>
+    <text x="44" y="408" font-size="14" font-weight="600" fill="#15211d">6 · Reliability</text>
+    <text x="44" y="428" font-size="11.5" fill="#5d6c66">keeps it running, never weaker</text>
+    <text x="300" y="408" fill="#15211d">failover only to other attested TEE models · circuit breaker · retries</text>
+    <text x="300" y="428" fill="#15211d">exactly-once outbox · two-model rule before any account freeze</text>
+    <text x="944" y="418" font-family="JetBrains Mono, monospace" font-size="11.5" fill="#2a6fb8">10 attested tool models</text></g>
+  <text x="24" y="464" font-size="11" fill="#5d6c66">Layers 1–3 protect the data, 4–5 protect the decisions, 6 keeps both available.</text>
+</svg>
+    </div>
+  </section>
+
+  <section class="two">
+    <div class="panel">
+      <h2>Two-model rule</h2>
+      <p>An account freeze is the one action that hurts a real customer if it is wrong. Before the outbox runs it, a second attested model from a different vendor reviews the same evidence independently. The freeze runs only if both agree; otherwise it goes back as a proposal.</p>
+      <p class="muted">Both models run in TEEs with their own attestation and signatures, so the second opinion is as private and verifiable as the first.</p>
+      <h2 style="margin-top:6px">Attested failover pool</h2>
+      <p>If the primary model fails, the sidecar moves to the next model only after attesting it. Every one of these returned hardware attestation and supports tool calling:</p>
+      <p class="muted" style="font-family:var(--mono);font-size:12px">z-ai/glm-5.3-flash → z-ai/glm-5.3 → moonshotai/kimi-k3 → Qwen/Qwen3.8-27B → deepseek-ai/DeepSeek-V4.1-Flash-1017</p>
+    </div>
+    <div class="panel">
+      <h2>Threats and the control that stops each</h2>
+      <table>
+        <thead><tr><th>Threat</th><th>Control</th><th>Status</th></tr></thead>
+        <tbody>
+          <tr><td>Fake or outdated TEE</td><td>Intel-signed attestation, quote-bound key, TCB policy</td><td><span class="pill ok">tested</span></td></tr>
+          <tr><td>Gateway or network reads data</td><td>End-to-end encryption</td><td><span class="pill ok">tested</span></td></tr>
+          <tr><td>Response altered or tool call forged</td><td>Signed-tool gate</td><td><span class="pill ok">tested</span></td></tr>
+          <tr><td>Evidence edited afterwards</td><td>Transcript chain + receipt</td><td><span class="pill ok">tested</span></td></tr>
+          <tr><td>Malicious memo hijacks the agent</td><td>Injection guard (Jev)</td><td><span class="pill ok">tested in live agent</span></td></tr>
+          <tr><td>Request rerouted to another model</td><td>No-aliasing header + attested key pin in sidecar</td><td><span class="pill ok">tested</span></td></tr>
+          <tr><td>Hallucinated freeze</td><td>Ledger checks + two-model rule</td><td><span class="pill ok">tested</span></td></tr>
+          <tr><td>Personal data to non-TEE models</td><td>Privacy gate (NEAR privacy filter + names)</td><td><span class="pill ok">tested</span></td></tr>
+          <tr><td>Provider outage</td><td>Retries + attested failover pool</td><td><span class="pill ok">tested</span></td></tr>
+          <tr><td>Signed request for an account outside the case</td><td>Per-case account scope</td><td><span class="pill plain">not built</span></td></tr>
+          <tr><td>Policy silently changed</td><td>Policy hash in receipt + on NEAR</td><td><span class="pill plain">receipt done, anchor to build</span></td></tr>
+          <tr><td>Who-sent-what metadata</td><td>OHTTP</td><td><span class="pill plain">in the API, undocumented</span></td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+</div>

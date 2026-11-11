@@ -19,6 +19,23 @@ def accounts() -> dict[str, dict]:
     return {r["account"]: r for r in csv.DictReader((ROOT / "samples" / "accounts.csv").open())}
 
 
+def flags_for(t: dict, subject: str, acc: dict[str, dict], as_of: str = "2026-11-10") -> list[str]:
+    """Why a single transaction looks suspicious in the context of `subject`."""
+    out = []
+    amt, other = t["amount_usd"], (t["from_account"] if t["to_account"] == subject else t["to_account"])
+    if t["type"] == "cash_deposit" and 9000 <= amt < 10000:
+        out.append("structuring")
+    o = acc.get(other)
+    if t["to_account"] == subject and other != subject and o and \
+            (date.fromisoformat(as_of) - date.fromisoformat(o["opened"])).days < 60:
+        out.append("new_sender")
+    if t["country"] in HIGH_RISK:
+        out.append("offshore")
+    if amt >= 50000:
+        out.append("large")
+    return out
+
+
 def features(as_of: str = "2026-11-10") -> dict[str, dict]:
     """Pseudonymous per-account features: ids and numbers only, no names."""
     acc = accounts()

@@ -1,0 +1,325 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Clean Ledger</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: alert queue on the left, the selected account's evidence on the right. Light only. */
+:root {
+  color-scheme: light;
+  --bg: #f4f7f6; --surface: #ffffff; --ink: #15211d; --muted: #5d6c66; --line: #dde6e2; --row: #f9fbfa;
+  --accent: #0e7a62; --accent-soft: #e3f2ed;
+  --violet: #5b4bb7; --violet-soft: #eeebfa; --info: #2a6fb8; --info-soft: #e4eef9;
+  --ok: #1d8a4b; --ok-soft: #e4f4ea; --warn: #a8690f; --warn-soft: #fbf0dc; --crit: #b8402b; --crit-soft: #fbe7e2;
+  --display: "Space Grotesk", "Segoe UI", system-ui, sans-serif;
+  --body: "Inter", system-ui, -apple-system, sans-serif;
+  --mono: "JetBrains Mono", ui-monospace, Menlo, monospace;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; }
+body { background: var(--bg); color: var(--ink); font: 14px/1.5 var(--body); }
+h1, h2, h3 { font-family: var(--display); margin: 0; letter-spacing: -0.01em; text-wrap: balance; }
+h1 { font-size: 20px; } h2 { font-size: 17px; } h3 { font-size: 14px; }
+p { margin: 0; }
+button { font: inherit; }
+.mono { font-family: var(--mono); font-size: 12.5px; }
+.muted { color: var(--muted); }
+.eyebrow { font: 600 11px/1 var(--body); letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+.pill { display: inline-flex; align-items: center; gap: 6px; padding: 3px 9px; border-radius: 999px; font: 500 11.5px/1.4 var(--body); white-space: nowrap; }
+.dot::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+.ok { color: var(--ok); background: var(--ok-soft); } .warn { color: var(--warn); background: var(--warn-soft); }
+.crit { color: var(--crit); background: var(--crit-soft); } .acc { color: var(--accent); background: var(--accent-soft); }
+.vio { color: var(--violet); background: var(--violet-soft); } .plain { color: var(--muted); background: var(--bg); }
+.info { color: var(--info); background: var(--info-soft); }
+
+header.top { position: sticky; top: 0; z-index: 5; background: var(--surface); border-bottom: 1px solid var(--line);
+  display: flex; flex-wrap: wrap; gap: 12px; align-items: center; justify-content: space-between; padding: 12px max(16px, env(safe-area-inset-left, 0px)); }
+.brand { display: flex; align-items: center; gap: 10px; }
+.mark { width: 30px; height: 30px; border-radius: 8px; background: var(--accent); display: grid; place-items: center; }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+
+.layout { display: grid; grid-template-columns: 300px minmax(0, 1fr); gap: 20px; max-width: 1280px; margin: 0 auto; padding: 20px max(16px, env(safe-area-inset-left, 0px)) 48px; }
+aside { display: grid; gap: 10px; align-content: start; }
+.alert { all: unset; cursor: pointer; display: grid; gap: 6px; background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; }
+.alert:hover { border-color: var(--accent); }
+.alert:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.alert[aria-current="true"] { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+.alert .l1 { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+.alert b { font: 600 15px/1.2 var(--display); }
+.sig { display: flex; flex-wrap: wrap; gap: 4px; }
+.sig span { font: 500 11px/1.4 var(--body); color: var(--muted); background: var(--bg); border-radius: 6px; padding: 1px 6px; }
+
+main { display: grid; gap: 18px; min-width: 0; align-content: start; }
+.panel { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 18px 20px; display: grid; gap: 14px; min-width: 0; }
+.head { display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: baseline; justify-content: space-between; }
+.kpis { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; }
+.kpi { border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; display: grid; gap: 4px; }
+.kpi b { font: 600 20px/1.1 var(--display); font-variant-numeric: tabular-nums; }
+
+.flow { overflow-x: auto; }
+.flow svg { display: block; min-width: 720px; width: 100%; height: auto; }
+
+.tools { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; justify-content: space-between; }
+.switch { display: inline-flex; align-items: center; gap: 8px; cursor: pointer; font-size: 13px; }
+.tablewrap { overflow-x: auto; border: 1px solid var(--line); border-radius: 10px; }
+table { width: 100%; border-collapse: collapse; font-size: 13px; }
+th { text-align: left; font: 600 11px/1 var(--body); letter-spacing: .06em; text-transform: uppercase; color: var(--muted); padding: 10px 12px; background: var(--row); border-bottom: 1px solid var(--line); position: sticky; top: 0; }
+td { padding: 9px 12px; border-bottom: 1px solid var(--line); white-space: nowrap; }
+tr:last-child td { border-bottom: 0; }
+td.amt { text-align: right; font-variant-numeric: tabular-nums; font-family: var(--mono); font-size: 12.5px; }
+tr.flagged td:first-child { box-shadow: inset 3px 0 0 var(--crit); }
+tr.flagged { background: #fffaf8; }
+.dir { font: 600 11px/1 var(--mono); padding: 3px 6px; border-radius: 5px; }
+.dir.in { color: var(--ok); background: var(--ok-soft); } .dir.out { color: var(--crit); background: var(--crit-soft); } .dir.self { color: var(--muted); background: var(--bg); }
+
+.btn { cursor: pointer; border: 0; border-radius: 9px; padding: 9px 14px; font-weight: 600; font-size: 13px; background: var(--accent); color: #fff; }
+.btn.ghost { background: var(--surface); color: var(--accent); border: 1px solid var(--accent); }
+.btn:disabled { opacity: .55; cursor: progress; }
+.btn:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
+.two { display: grid; grid-template-columns: 1.3fr 1fr; gap: 16px; }
+.md { font-size: 13.5px; display: grid; gap: 8px; }
+.md h4 { margin: 6px 0 0; font: 600 13px/1.3 var(--display); }
+.md ul { margin: 0; padding-left: 18px; }
+.steps { display: grid; gap: 6px; }
+.step { display: grid; grid-template-columns: 26px minmax(0, 1fr); gap: 8px; align-items: start; font-size: 13px; }
+.step .n { font: 600 11px/22px var(--mono); text-align: center; background: var(--accent-soft); color: var(--accent); border-radius: 6px; }
+.event { display: flex; flex-wrap: wrap; gap: 6px 10px; justify-content: space-between; align-items: center; padding: 9px 0; border-bottom: 1px solid var(--line); }
+.event:last-child { border-bottom: 0; }
+.toast { font-size: 13px; padding: 8px 12px; border-radius: 9px; }
+.empty { padding: 28px; text-align: center; color: var(--muted); }
+@media (max-width: 900px) { .layout { grid-template-columns: minmax(0, 1fr); } aside { min-width: 0; } .kpis { grid-template-columns: 1fr 1fr; } .two { grid-template-columns: 1fr; } }
+/* click-a-transaction ICM flow */
+tbody tr[data-txn] { cursor: pointer; }
+tbody tr[data-txn]:hover td, tr.picked, tr.picked td { background: var(--accent-soft) !important; }
+tbody tr[data-txn]:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+.legend { display: flex; flex-wrap: wrap; gap: 8px; }
+.flowcards { display: grid; grid-template-columns: minmax(0,1fr) auto minmax(0,1fr) auto minmax(0,1fr) auto minmax(0,1fr); gap: 8px; align-items: stretch; }
+.farrow { align-self: center; color: var(--muted); font-size: 20px; }
+.fcard { border: 1px solid var(--line); border-top-width: 4px; border-radius: 12px; padding: 12px 14px; display: grid; gap: 8px; align-content: start; background: var(--surface); min-width: 0; }
+.fcard.st-hash { border-top-color: var(--info); } .fcard.st-clear { border-top-color: var(--ok); }
+.fcard.st-flag { border-top-color: var(--warn); } .fcard.st-seen { border-top-color: var(--violet); }
+.fcard.st-evidence, .fcard.st-acted { border-top-color: var(--crit); } .fcard.st-idle { border-top-color: var(--line); }
+.fh { display: flex; flex-wrap: wrap; gap: 6px 8px; align-items: center; }
+.fn { width: 20px; height: 20px; border-radius: 6px; background: var(--bg); font: 600 11px/20px var(--mono); text-align: center; }
+.fpath { color: var(--muted); font-size: 11.5px; }
+.fcard ul { margin: 0; padding-left: 16px; font-size: 12.5px; display: grid; gap: 4px; }
+.fsees { font-size: 12px; color: var(--muted); display: grid; gap: 2px; }
+.file { font: 11px/1.4 var(--mono); padding: 2px 6px; background: var(--bg); border: 1px solid var(--line); border-radius: 6px; }
+.verified { border: 1px solid var(--line); border-radius: 10px; padding: 10px 14px; background: var(--row); }
+.verified summary { cursor: pointer; display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+.verified ul { list-style: none; padding: 0; margin: 10px 0 0; display: grid; gap: 4px; font-size: 12.5px; }
+.okx span:first-child { color: var(--ok); font-weight: 700; } .badx span:first-child { color: var(--crit); font-weight: 700; }
+@media (max-width: 900px) { .flowcards { grid-template-columns: minmax(0,1fr); } .farrow { transform: rotate(90deg); justify-self: center; } }
+@media (prefers-reduced-motion: no-preference) { .alert { transition: border-color .15s, box-shadow .15s; } }
+</style>
+</head>
+<body>
+<header class="top">
+  <div class="brand">
+    <div class="mark" aria-hidden="true"><svg width="18" height="18" viewBox="0 0 20 20" fill="none" stroke="#fff" stroke-width="1.8"><path d="M4 5h12M4 10h12M4 15h7"/><path d="M13.5 14.5l1.6 1.6 3-3.2"/></svg></div>
+    <div><h1>Clean Ledger</h1><p class="muted" style="font-size:12.5px">Flagged transactions · private AML investigation on NEAR AI</p></div>
+  </div>
+  <div class="chips" id="status"></div>
+</header>
+
+<div class="layout">
+  <aside aria-label="Alert queue">
+    <div class="head"><h2>Alert queue</h2><span class="muted" id="alertCount"></span></div>
+    <div id="alerts" style="display:grid;gap:10px"></div>
+  </aside>
+
+  <main id="main"><div class="panel empty">Select an alert to see its flagged transactions.</div></main>
+</div>
+
+<script>
+const $ = id => document.getElementById(id);
+const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const pill = (cls, t, dot = true) => `<span class="pill ${cls} ${dot ? "dot" : ""}">${esc(t)}</span>`;
+const usd = n => "$" + Number(n).toLocaleString("en-US", {maximumFractionDigits: 0});
+const FLAG = {structuring: ["warn", "Structuring <$10k"], new_sender: ["vio", "New-account sender"], offshore: ["crit", "Offshore wire"], large: ["acc", "Large amount"]};
+const SIG = {fan_in_new_accounts: "fan-in", rapid_pass_through: "pass-through", high_risk_destination: "offshore", new_account_burst: "new account", structuring: "structuring"};
+const api = async (path, opts) => { const r = await fetch(path, opts); if (!r.ok) throw new Error((await r.json()).detail || r.statusText); return r.json(); };
+let current = null, flaggedOnly = true;
+let hashTxn = (location.hash.match(/^#(T\d{4})$/) || [])[1];  // e.g. /#T0213 opens that transaction's flow
+
+async function boot() {
+  const s = await api("/api/status");
+  $("status").innerHTML = (s.agent_mode === "live" ? pill("ok", "Agent: live TEE") : pill("warn", "Agent: simulated (add key)"))
+    + pill("acc", `${s.agent_model} · ${s.agent_tier}`, false) + pill("plain", `${s.transactions} txns · ${s.accounts} accounts`, false);
+  const alerts = await api("/api/alerts");
+  $("alertCount").textContent = `${alerts.length} open`;
+  $("alerts").innerHTML = alerts.map(a => `
+    <button class="alert" data-a="${esc(a.account)}">
+      <span class="l1"><b>${esc(a.account)}</b>${a.decision === "escalate" ? pill("crit", "escalate") : pill("warn", "review")}</span>
+      <span class="l1"><span class="muted">${a.in_usd ? usd(a.in_usd) + " in" : a.cash_9k + " cash deposits of $9–10k"} · ${esc(a.kind)}</span><span class="mono muted">${a.confidence.toFixed(2)}</span></span>
+      <span class="sig">${a.signals.map(x => `<span>${esc(SIG[x] || x)}</span>`).join("")}${a.case_exists ? `<span style="color:var(--accent)">case open</span>` : ""}</span>
+    </button>`).join("");
+  document.querySelectorAll(".alert").forEach(b => b.onclick = () => select(b.dataset.a));
+  if (alerts[0]) select(alerts[0].account);
+}
+
+async function select(account) {
+  current = account;
+  document.querySelectorAll(".alert").forEach(b => b.setAttribute("aria-current", b.dataset.a === account));
+  const [acc, flow] = await Promise.all([api(`/api/accounts/${account}`), api(`/api/accounts/${account}/flow`)]);
+  const f = acc.features, p = acc.profile;
+  $("main").innerHTML = `
+    <section class="panel">
+      <div class="head"><div><span class="eyebrow">Subject account</span><h2>${esc(account)} · ${esc(p.name)}</h2></div>
+        <span class="muted">Opened ${esc(p.opened)} · ${esc(p.kind)} · ${esc(p.country)}</span></div>
+      <div class="kpis">
+        <div class="kpi"><span class="eyebrow">Money in</span><b>${usd(f.in_usd)}</b><span class="muted">${f.distinct_senders} senders · ${f.new_account_senders} new</span></div>
+        <div class="kpi"><span class="eyebrow">Money out</span><b>${usd(f.out_usd)}</b><span class="muted">${f.high_risk_wires_out} offshore wire${f.high_risk_wires_out === 1 ? "" : "s"}</span></div>
+        <div class="kpi"><span class="eyebrow">Pass-through</span><b>${Math.round(f.pass_through_ratio * 100)}%</b><span class="muted">of inbound sent on</span></div>
+        <div class="kpi"><span class="eyebrow">Flagged</span><b>${acc.flagged} / ${acc.transactions.length}</b><span class="muted">transactions</span></div>
+      </div>
+    </section>
+    <section class="panel"><div class="head"><h2>Money trail</h2><span class="muted">Line width = dollars moved</span></div><div class="flow">${flowSvg(flow)}</div></section>
+    <section class="panel">
+      <div class="tools"><h2>Transactions</h2>
+        <label class="switch"><input type="checkbox" id="fOnly" ${flaggedOnly ? "checked" : ""}> Flagged only</label></div>
+      <div class="chips">${Object.values(FLAG).map(([c, t]) => pill(c, t)).join("")}</div>
+      <div class="tablewrap"><table><thead><tr><th>Date</th><th>Txn</th><th></th><th>Counterparty</th><th>Type</th><th style="text-align:right">Amount</th><th>Why flagged</th></tr></thead>
+      <tbody id="rows"></tbody></table></div>
+    </section>
+    <section class="panel" id="txflow" hidden></section>
+    <section class="panel" id="inv"></section>`;
+  const renderRows = () => {
+    const rows = acc.transactions.filter(r => !flaggedOnly || r.flags.length);
+    $("rows").innerHTML = rows.map(r => {
+      const other = r.direction === "in" ? r.from_account : r.to_account;
+      return `<tr class="${r.flags.length ? "flagged" : ""}" data-txn="${esc(r.txn_id)}" tabindex="0" title="Click to see this transaction's ICM flow"><td class="mono">${esc(r.date)}</td><td class="mono">${esc(r.txn_id)}</td>
+        <td><span class="dir ${r.direction}">${r.direction.toUpperCase()}</span></td><td class="mono">${esc(other)}${r.country !== "US" ? ` <span class="muted">(${esc(r.country)})</span>` : ""}</td>
+        <td>${esc(r.type.replace("_", " "))}</td><td class="amt">${usd(r.amount_usd)}</td>
+        <td><span class="chips">${r.flags.map(x => pill(FLAG[x][0], FLAG[x][1])).join("") || '<span class="muted">none</span>'}</span></td></tr>`;
+    }).join("") || `<tr><td colspan="7" class="empty">No flagged transactions on this account.</td></tr>`;
+  };
+  $("fOnly").onchange = e => { flaggedOnly = e.target.checked; renderRows(); };
+  renderRows();
+  $("rows").onclick = e => { const tr = e.target.closest("tr[data-txn]"); if (tr) showFlow(tr.dataset.txn); };
+  $("rows").onkeydown = e => { const tr = e.target.closest("tr[data-txn]"); if (tr && (e.key === "Enter" || e.key === " ")) { e.preventDefault(); showFlow(tr.dataset.txn); } };
+  try { renderCase(await api(`/api/cases/case-${account}`)); } catch { renderCase(null); }
+  if (hashTxn) { const h = hashTxn; hashTxn = null; showFlow(h); }
+}
+
+function flowSvg(fl) {
+  const W = 900, rowH = 34, ups = fl.upstream, downs = fl.downstream;
+  const H = Math.max(ups.length, downs.length, 3) * rowH + 70;
+  const max = Math.max(1, ...ups.map(u => u.usd), ...downs.map(d => d.usd));
+  const w = v => 1.5 + 12 * v / max;
+  const y = (i, n) => 50 + (H - 70) * (i + 0.5) / Math.max(n, 1);
+  const cx = [90, 330, 590, 810], sy = H / 2 + 10;
+  let s = `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Money trail for ${esc(fl.subject)}" font-family="Inter, sans-serif" font-size="12">`;
+  ["Cash deposits", "Senders", "Subject", "Destination"].forEach((t, i) => s += `<text x="${cx[i]}" y="22" text-anchor="middle" fill="#5d6c66" font-size="11" font-weight="600" letter-spacing="1">${t.toUpperCase()}</text>`);
+  ups.forEach((u, i) => {
+    const yy = y(i, ups.length);
+    if (u.cash_in) s += `<path d="M${cx[0] + 50} ${yy} C ${cx[0] + 120} ${yy}, ${cx[1] - 120} ${yy}, ${cx[1] - 52} ${yy}" stroke="#a8690f" stroke-opacity=".55" stroke-width="${w(u.cash_in)}" fill="none"/>
+      <text x="${cx[0] + 44}" y="${yy + 4}" text-anchor="end" fill="#a8690f" font-family="JetBrains Mono, monospace" font-size="11.5">${usd(u.cash_in)} cash</text>`;
+    s += `<path d="M${cx[1] + 52} ${yy} C ${cx[1] + 150} ${yy}, ${cx[2] - 150} ${sy}, ${cx[2] - 62} ${sy}" stroke="#5b4bb7" stroke-opacity=".45" stroke-width="${w(u.usd)}" fill="none"/>
+      <rect x="${cx[1] - 52}" y="${yy - 12}" width="104" height="24" rx="6" fill="#ffffff" stroke="#dde6e2"/>
+      <text x="${cx[1]}" y="${yy + 4}" text-anchor="middle" fill="#15211d" font-family="JetBrains Mono, monospace" font-size="11.5">${esc(u.account)}</text>
+      <text x="${cx[1] + 58}" y="${yy - 6}" fill="#5d6c66" font-size="10.5">${usd(u.usd)}</text>`;
+  });
+  if (fl.upstream_more) s += `<text x="${cx[1]}" y="${H - 6}" text-anchor="middle" fill="#5d6c66" font-size="11">+${fl.upstream_more} smaller senders</text>`;
+  downs.forEach((d, i) => {
+    const yy = y(i, downs.length), off = d.country !== "US";
+    s += `<path d="M${cx[2] + 62} ${sy} C ${cx[2] + 140} ${sy}, ${cx[3] - 140} ${yy}, ${cx[3] - 58} ${yy}" stroke="${off ? "#b8402b" : "#0e7a62"}" stroke-opacity=".55" stroke-width="${w(d.usd)}" fill="none"/>
+      <rect x="${cx[3] - 58}" y="${yy - 12}" width="116" height="24" rx="6" fill="${off ? "#fbe7e2" : "#ffffff"}" stroke="${off ? "#b8402b" : "#dde6e2"}"/>
+      <text x="${cx[3]}" y="${yy + 4}" text-anchor="middle" fill="#15211d" font-family="JetBrains Mono, monospace" font-size="11.5">${esc(d.account)} ${off ? "(" + esc(d.country) + ")" : ""}</text>
+      <text x="${cx[2] + 70}" y="${sy - 12 - i * 14}" fill="${off ? "#b8402b" : "#5d6c66"}" font-size="10.5">${usd(d.usd)} out</text>`;
+  });
+  s += `<rect x="${cx[2] - 62}" y="${sy - 18}" width="124" height="36" rx="8" fill="#e3f2ed" stroke="#0e7a62" stroke-width="2"/>
+    <text x="${cx[2]}" y="${sy + 5}" text-anchor="middle" fill="#15211d" font-weight="600" font-family="Space Grotesk, sans-serif" font-size="14">${esc(fl.subject)}</text></svg>`;
+  return s;
+}
+
+function md(text) {
+  return text.split("\n").reduce((acc, line) => {
+    if (/^# /.test(line)) return acc;
+    if (/^## /.test(line)) return acc + `<h4>${esc(line.slice(3))}</h4>`;
+    if (/^- /.test(line)) return acc + `<ul><li>${esc(line.slice(2))}</li></ul>`;
+    return line.trim() ? acc + `<p>${esc(line)}</p>` : acc;
+  }, "").replace(/<\/ul><ul>/g, "");
+}
+
+function renderCase(c) {
+  if (!c) {
+    $("inv").innerHTML = `<div class="head"><h2>Investigation</h2><span class="muted">Not started</span></div>
+      <p class="muted">The agent runs inside NEAR AI's confidential TEE, picks its own tools, and proposes actions that cite transaction ids.</p>
+      <div><button class="btn" id="go">Investigate in TEE</button></div><div id="msg"></div>`;
+    $("go").onclick = runInvestigation;
+    return;
+  }
+  const a = c.actions, sim = a.simulated;
+  $("inv").innerHTML = `
+    <div class="head"><h2>Investigation · ${esc(c.case)}</h2>
+      <span class="chips">${sim ? pill("warn", "Simulated run") : pill("ok", "Live TEE run")}${pill("crit", `risk ${a.risk ?? "n/a"}`)}${c.proof ? pill("vio", `${c.proof.model} · ${c.proof.tier}`, false) : ""}</span></div>
+    ${verifiedHtml(c.verification)}
+    <div class="two">
+      <div class="md">${md(c.findings)}</div>
+      <div style="display:grid;gap:16px;align-content:start">
+        <div style="display:grid;gap:8px"><h3>Agent steps</h3><div class="steps">${c.trace.map(t => `<div class="step"><span class="n">${t.step}</span><span><span class="mono">${esc(t.tool)}</span><span class="muted"> (${esc(argStr(t))})</span>${t.rejected ? ` ${pill("warn", "answer rejected, agent corrected it", false)}` : ""}${t.guard_flags ? ` ${pill("warn", "memo withheld: injection guard", false)}` : ""}${t.review ? ` ${pill(t.review.agree ? "ok" : "crit", "second opinion " + (t.review.agree ? "agrees" : "disagrees") + " · " + (t.review.model || "").split("/").pop(), false)}` : ""}${t.preview ? `<div class="muted" style="font-size:12px">matches ${t.preview.map(m => `${esc(m.case_id)} (${m.similarity})`).join(", ")}</div>` : ""}</span></div>`).join("")}</div></div>
+        <div style="display:grid;gap:8px"><h3>Proposed actions</h3>${a.proposed_actions.map(p => `<div class="event"><span><b>${esc(p.action)}</b> <span class="mono">${esc(p.target)}</span></span>${p.amount_usd ? pill("acc", usd(p.amount_usd), false) : ""}${p.second_opinion ? (p.held ? pill("crit", "held: second model disagreed") : pill("ok", "confirmed by " + esc((p.second_opinion.model || "").split("/").pop()))) : ""}${p.second_opinion ? `<span class="muted" style="width:100%;font-size:12px">Second opinion: ${esc(p.second_opinion.reason)}</span>` : ""}<span class="muted mono" style="width:100%">evidence ${esc(p.evidence_txn_ids.slice(0, 5).join(", "))}${p.evidence_txn_ids.length > 5 ? " …" : ""}</span></div>`).join("")}</div>
+        <div style="display:grid;gap:8px"><div class="head"><h3>Outbox</h3><button class="btn" id="exec">Run outbox</button></div><div id="msg"></div><div id="events">${events(c.outbox)}</div></div>
+        <div><button class="btn ghost" id="again">Re-investigate</button></div>
+      </div>
+    </div>`;
+  $("exec").onclick = runOutbox;
+  $("again").onclick = runInvestigation;
+}
+const events = ev => ev.length ? ev.map(e => `<div class="event"><span><b>${esc(e.type)}</b> <span class="mono">${esc(e.target)}</span></span>${pill("warn", e.status)}<span class="mono muted" style="width:100%">key ${esc(e.idempotency_key.slice(0, 20))}…</span></div>`).join("") : `<p class="muted">No events yet.</p>`;
+
+async function runInvestigation() {
+  const b = this; b.disabled = true; b.textContent = "Investigating…";
+  try { const c = await api(`/api/investigate/${current}`, {method: "POST"}); renderCase(c); boot(); }
+  catch (e) { $("msg").innerHTML = `<p class="toast crit">${esc(e.message)}</p>`; b.disabled = false; b.textContent = "Try again"; }
+}
+async function runOutbox() {
+  const b = $("exec"); b.disabled = true;
+  try {
+    const r = await api(`/api/cases/case-${current}/execute`, {method: "POST"});
+    $("events").innerHTML = events(r.events);
+    $("msg").innerHTML = `<p class="toast ${r.new ? "ok" : "acc"}">${r.new} new event${r.new === 1 ? "" : "s"}, ${r.skipped} already present (skipped). ${r.new ? "" : "Exactly once: nothing ran twice."}</p>`;
+  } catch (e) { $("msg").innerHTML = `<p class="toast crit">${esc(e.message)}</p>`; }
+  b.disabled = false;
+}
+const argStr = t => t.tool === "finish" ? "final answer" : Object.values(t.args || {}).map(v => typeof v === "object" ? "…" : v).join(", ");
+const STATEC = {hash: "info", clear: "ok", flag: "warn", seen: "vio", evidence: "crit", acted: "crit", idle: "plain"};
+function verifiedHtml(v) {
+  if (!v) return "";
+  const li = (ok, text, detail) => `<li class="${ok ? "okx" : "badx"}"><span>${ok ? "✓" : "✗"}</span><span>${esc(text)}${detail ? ` <span class="muted">· ${esc(detail)}</span>` : ""}</span></li>`;
+  return `<details class="verified" open><summary><b>Verified</b> ${pill(v.all_verified ? "ok" : "crit", v.all_verified ? `${v.verified_calls} of ${v.calls} model calls attested and signature-checked` : "verification incomplete")}
+    <span class="muted">${esc(v.model)} · ${esc(v.tier)} tier · TCB ${esc(v.tcb_status)}</span></summary>
+    <ul>${v.checks.map(c => li(c.ok, c.name, c.detail)).join("")}
+    ${v.e2ee_calls != null ? li(v.e2ee_calls > 0 && v.e2ee_calls === v.calls, `end-to-end encrypted: ${v.e2ee_calls} of ${v.calls} calls, the gateway saw ciphertext only`, (v.models || []).join(", ")) : ""}
+    ${li(v.request_hash_matches, "request bytes hash to what the TEE signed")}${li(v.response_hash_matches, "response bytes hash to what the TEE signed")}</ul>
+    <p class="muted mono" style="margin-top:8px">Intel token ${esc(v.attestation_jti)} · signing key ${esc(v.signing_address.slice(0, 16))}…</p></details>`;
+}
+async function showFlow(txn) {
+  document.querySelectorAll("#rows tr").forEach(r => r.classList.toggle("picked", r.dataset.txn === txn));
+  const el = $("txflow"); el.hidden = false; el.innerHTML = `<p class="muted">Loading flow…</p>`;
+  try {
+    const d = await api(`/api/transactions/${encodeURIComponent(txn)}/flow?account=${encodeURIComponent(current)}`);
+    const t = d.txn;
+    el.innerHTML = `
+      <div class="head"><div><span class="eyebrow">ICM flow for one transaction</span><h2>${esc(t.txn_id)} · ${usd(t.amount_usd)} ${esc(t.type.replace("_", " "))}</h2></div>
+        <span class="muted mono">${esc(t.date)} · ${esc(t.from_account)} → ${esc(t.to_account)}${t.country !== "US" ? " (" + esc(t.country) + ")" : ""}</span></div>
+      <div class="legend">${[["info", "Hashed"], ["ok", "Checked, clear"], ["warn", "Signal raised"], ["vio", "Seen by private AI"], ["crit", "Evidence / action triggered"], ["plain", "Not involved"]].map(([c, l]) => pill(c, l)).join("")}</div>
+      <div class="flowcards">${d.stages.map((s, i) => `
+        <article class="fcard st-${s.state}">
+          <div class="fh"><span class="fn">${i + 1}</span><b>${esc(s.title)}</b>${pill(STATEC[s.state], s.label)}</div>
+          <div class="fpath">${esc(s.folder)}/</div>
+          <ul>${s.notes.map(n => `<li>${esc(n)}</li>`).join("")}</ul>
+          <div class="fsees"><span class="eyebrow">Can see</span><span>${esc(s.sees)}</span></div>
+          <div class="chips">${s.badges.map(b => pill(b.cls, b.text, false)).join("")}${s.files.map(f => `<span class="file">${esc(f)}</span>`).join("")}</div>
+        </article>`).join('<div class="farrow" aria-hidden="true">→</div>')}</div>`;
+    el.scrollIntoView({behavior: "smooth", block: "nearest"});
+  } catch (e) { el.innerHTML = `<p class="toast crit">${esc(e.message)}</p>`; }
+}
+boot();
+</script>
+</body>
+</html>
